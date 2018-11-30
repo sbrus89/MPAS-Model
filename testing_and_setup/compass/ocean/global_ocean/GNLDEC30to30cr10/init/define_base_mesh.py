@@ -74,21 +74,24 @@ def cellWidthVsLatLon():
     cell_width, lon, lat = ct.coastal_refined_mesh(params,cell_width,lon,lat)
 
     print "***Bering Straight****"
+    params["dx_min_coastal"] = 10.0*km
+    params["trans_width"] = 300.0*km
+    params["trans_start"] = 100.0*km
     params["lon_wrap"] = True
     params["region_box"] = {"include":[np.array([-172.5,-165,65,66.5])],
                             "exclude":[]} 
     cell_width,lon,lat = ct.coastal_refined_mesh(params,cell_width,lon,lat)
 
     print "***Greenland***"
-    Greenland = {"include":[np.array([[-66.06,71.33],
-                                      [-46.36,57.87],
-                                      [-25.45,65.36],
-                                      [-12.76,74.20]])],
+    Greenland = {"include":[np.array([[-50.89,57.89],
+                                      [-36.40,59.54],
+                                      [-28.31,67.63],
+                                      [-59.18,76.02]])],
                  "exclude":[]}
     params["region_box"] = Greenland 
     params["restrict_box"] = ct.Empty
     params["dx_min_coastal"] = 10.0*km
-    params["trans_width"] = 300.0*km
+    params["trans_width"] = 200.0*km
     params["trans_start"] = 100.0*km
     params["lon_wrap"] = False  
     cell_width, lon, lat = ct.coastal_refined_mesh(params,cell_width,lon,lat)
