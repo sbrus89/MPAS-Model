@@ -10,10 +10,11 @@ def cellWidthVsLatLon():
 
     params = ct.default_params
     params["dx_min_coastal"] = 20.0*km
-    params["trans_width"] = 600.0*km
-    params["trans_start"] = 400.0*km
+    params["trans_width"] = 1200.0*km
+    params["trans_start"] = 200.0*km
     params["mesh_type"] = "EC"
     params["dx_max_global"] = 120.0*km
+    params["n_longest"] = 20
 
     params["plot_box"] = np.array([-140,0,30,90]) 
 
@@ -37,8 +38,6 @@ def cellWidthVsLatLon():
 
 
 
-    params["origin"] = np.array([-70,73])
-
     print "***Northern Canada***"
     params["region_box"] = {"include":[np.array([-126.5,-59,67,85])],
                             "exclude":[]}
@@ -50,8 +49,6 @@ def cellWidthVsLatLon():
                     "exclude":[]}
     params["region_box"] = Newfoundland 
     params["restrict_box"] = ct.Empty
-    params["trans_width"] = 600.0*km
-    params["trans_start"] = 400.0*km
     cell_width,lon,lat = ct.coastal_refined_mesh(params,cell_width,lon,lat)
 
     print "***Greenland***"
@@ -75,14 +72,14 @@ def cellWidthVsLatLon():
 
     print "***Bering Straight****"
     params["dx_min_coastal"] = 10.0*km
-    params["trans_width"] = 300.0*km
+    params["trans_width"] = 700.0*km
     params["trans_start"] = 100.0*km
     params["lon_wrap"] = True
     params["region_box"] = {"include":[np.array([-172.5,-165,65,66.5])],
                             "exclude":[]} 
     cell_width,lon,lat = ct.coastal_refined_mesh(params,cell_width,lon,lat)
 
-    print "***Greenland***"
+    print "***Greenland Coast***"
     Greenland = {"include":[np.array([[-50.89,57.89],
                                       [-36.40,59.54],
                                       [-28.31,67.63],
