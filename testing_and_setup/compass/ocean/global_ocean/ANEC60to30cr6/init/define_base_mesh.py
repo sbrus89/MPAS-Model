@@ -23,6 +23,7 @@ def cellWidthVsLatLon():
     params["region_box"] = {"include":[np.array([-180,180,-80,-60])],
                             "exclude":[]}
     params["restrict_box"] = ct.Empty
+    params["z_contour"] = -900.0
     cell_width, lon, lat = ct.coastal_refined_mesh(params)
 
 
