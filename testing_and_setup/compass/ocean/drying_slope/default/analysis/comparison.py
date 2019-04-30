@@ -36,19 +36,23 @@ def setup_subplot():
     y = 10.0/25.0*x
     plt.plot(x, y, 'k-', lw=3)
 
+
 def upper_plot():
     plt.subplot(2,1,1)
     plt.gca().set_xticklabels([])
     setup_subplot()
 
+
 def lower_plot():
     plt.subplot(2,1,2)
     setup_subplot()
+
 
 def plot_data(rval='0.0025', dtime='0.05', datatype='analytical', *args, **kwargs):
     datafile = 'data/r' + rval + 'd' + dtime + '-' + datatype + '.csv'
     data = pd.read_csv(datafile, header=None)
     measured=plt.scatter(data[0], data[1], *args, **kwargs)
+
 
 def plot_dataset(rval):
     times = ['0.50', '0.05', '0.40', '0.15', '0.30', '0.25']
@@ -68,23 +72,28 @@ def place_time_labels(times):
     for atime, ay in zip(times, locs):
         plt.text(25.2, ay, atime + ' days', size=8)
 
-setup_fig()
 
-############### subplot r = 0.0025 ###############
-upper_plot()
-plot_dataset(rval='0.0025')
+def main():
+    setup_fig()
 
-############### subplot r = 0.01   ###############
-lower_plot()
-plot_dataset(rval='0.01')
+    ############### subplot r = 0.0025 ###############
+    upper_plot()
+    plot_dataset(rval='0.0025')
+
+    ############### subplot r = 0.01   ###############
+    lower_plot()
+    plot_dataset(rval='0.01')
 
 
-# data from MPAS-O on boundary
-#ds = xr.open_mfdataset('output.nc')
-#ds.ssh.where(ds.tidalInputMask).mean('nCells').plot(marker='o', label='MPAS-O')
+    # data from MPAS-O on boundary
+    #ds = xr.open_mfdataset('output.nc')
+    #ds.ssh.where(ds.tidalInputMask).mean('nCells').plot(marker='o', label='MPAS-O')
 
-#plt.legend()
 
-plt.suptitle('Drying slope comparison between MPAS-O, analytical, and ROMS')
+    plt.suptitle('Drying slope comparison between MPAS-O, analytical, and ROMS')
 
-plt.savefig('dryingslopecomparison.png')
+    plt.savefig('dryingslopecomparison.png')
+
+
+if __name__ == "__main__":
+    main()
