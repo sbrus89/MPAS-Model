@@ -1,0 +1,52 @@
+# This file is the ocean core's configuration file. It is specific to the ocean
+# core, and a specific machine. Each machine will configure this file
+# differently, but it can be used to point on version of the testing
+# infrastructure at a different version of the model.
+
+
+# The namelists section defines paths to template namelists that will be used
+# to generate specific namelists. Typically these will point to the forward and
+# init namelists in the default_inputs directory after a successful build of
+# the ocean model.
+[namelists]
+forward = /Users/pwolfram/Documents/MPAS_development/MPAS_drying_slope/default_inputs/namelist.ocean.forward
+init =/Users/pwolfram/Documents/MPAS_development/MPAS_drying_slope/default_inputs/namelist.ocean.init
+
+
+# The streams section defines paths to template streams files that will be used
+# to generate specific streams files. Typically these will point to the forward and
+# init streams files in the default_inputs directory after a successful build of
+# the ocean model.
+[streams]
+forward =  /Users/pwolfram/Documents/MPAS_development/MPAS_drying_slope/default_inputs/streams.ocean.forward
+init = /Users/pwolfram/Documents/MPAS_development/MPAS_drying_slope/default_inputs/streams.ocean.init
+
+
+# The executables section defines paths to required executables. These
+# executables are provided for use by specific test cases.
+# Full paths should be provided in order to access the executables from
+# anywhere on the machine.
+[executables]
+model = /Users/pwolfram/Documents/MPAS_development/MPAS_drying_slope/ocean_model
+mesh_converter = /Users/pwolfram/Documents/MPAS_development/MPAS-Tools/mesh_tools/mesh_conversion_tools/MpasMeshConverter.x 
+cell_culler =  /Users/pwolfram/Documents/MPAS_development/MPAS-Tools/mesh_tools/mesh_conversion_tools/MpasCellCuller.x
+mask_creator = /Users/pwolfram/Documents/MPAS_development/MPAS-Tools/mesh_tools/mesh_conversion_tools/MpasMaskCreator.x
+metis =/usr/local/bin/gpmetis
+
+
+# The paths section describes paths that are used within the ocean core test
+# cases.
+[paths]
+
+# The mesh_database and the initial_condition_database are locations where
+# meshes / initial conditions might be found on a specific machine. They can be
+# the same directory, or different directory. Additionally, if they are empty
+# some test cases might download data into them, which will then be reused if
+# the test case is run again later.
+mesh_database = /Users/pwolfram/Documents/MPAS_development/MeshDatabase
+initial_condition_database = /Users/pwolfram/Documents/MPAS_development/InitCondDatabase
+geometric_features = /Users/pwolfram/Documents/MPAS_development/geometric_features
+jigsaw-geo-matlab = /Users/pwolfram/Documents/MPAS_development/jigsaw-geo-matlab 
+mpas_tools = /Users/pwolfram/Documents/MPAS_development/MPAS-Tools 
+bathymetry_database = /Users/pwolfram/Documents/MPAS_development/bathy_data
+jigsaw_to_MPAS = /Users/pwolfram/Documents/MPAS_development/MPAS_drying_slope/testing_and_setup/compass/ocean/jigsaw_to_MPAS
