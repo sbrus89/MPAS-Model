@@ -14,6 +14,7 @@ Phillip J. Wolfram and Zhendong Cao
 import numpy as np
 import xarray as xr
 import matplotlib.pyplot as plt
+import pandas as pd
 
 # render statically by default
 plt.switch_backend('agg')
@@ -44,16 +45,39 @@ def lower_plot():
     plt.subplot(2,1,2)
     setup_subplot()
 
+def plot_data(rval='0.0025', dtime='0.05', datatype='analytical', *args, **kwargs):
+    datafile = 'data/r' + rval + 'd' + dtime + '-' + datatype + '.csv'
+    data = pd.read_csv(datafile, header=None)
+    measured=plt.scatter(data[0], data[1], *args, **kwargs)
+
+def plot_dataset(rval):
+    times = ['0.50', '0.05', '0.40', '0.15', '0.30', '0.25']
+    for ii, dtime in enumerate(times):
+        plot_data(rval=rval, dtime = dtime, datatype = 'analytical',
+                  marker = '.', color = 'b', label='analytical')
+        plot_data(rval=rval, dtime = dtime, datatype = 'roms',
+                  marker = '.', color = 'g', label='ROMS')
+        if ii == 0:
+            plt.legend(frameon=False, loc='lower left')
+            place_time_labels(times)
+            plt.text(0.5, 5, 'r = ' + str(rval))
+
+
+def place_time_labels(times):
+    locs = [9.3, 7.2, 4.2, 2.2, 1.2, 0.2]
+    for atime, ay in zip(times, locs):
+        plt.text(25.2, ay, atime + ' days', size=8)
 
 setup_fig()
 
 ############### subplot r = 0.0025 ###############
 upper_plot()
-
-
+plot_dataset(rval='0.0025')
 
 ############### subplot r = 0.01   ###############
 lower_plot()
+plot_dataset(rval='0.01')
+
 
 # data from MPAS-O on boundary
 #ds = xr.open_mfdataset('output.nc')
@@ -61,6 +85,6 @@ lower_plot()
 
 #plt.legend()
 
-plt.suptitle('Drying slope comparison between MPAS-O, ROMS, and analytical')
+plt.suptitle('Drying slope comparison between MPAS-O, analytical, and ROMS')
 
 plt.savefig('dryingslopecomparison.png')
