@@ -12,9 +12,11 @@
 		<option name="config_ocean_run_mode">'init'</option>
 		<option name="config_init_configuration">'tidal_boundary'</option>
 		<option name="config_vert_levels">-1</option>
-		<option name="config_tidal_boundary_vert_levels">30</option>
-		<option name="config_tidal_boundary_left_bottom_depth">10.0</option>
-		<option name="config_tidal_boundary_right_bottom_depth">10.0</option>
+		<option name="config_tidal_boundary_vert_levels">100</option>
+		<option name="config_tidal_boundary_left_bottom_depth">0.0</option>
+		<option name="config_tidal_start_dry">.true.</option>
+		<option name="config_use_wetting_drying">.true.</option>
+		<option name="config_drying_min_cell_height">1e-3</option>
 		<option name="config_use_tidal_forcing">.true.</option>
 		<option name="config_write_cull_cell_mask">.false.</option>
 	</namelist>
@@ -67,16 +69,19 @@
 <!-- may be a better way to do this instead of sed -->    
 		<step executable="sed">
 			<argument flag="">-i</argument>
+			<argument flag="">.bak</argument>
 			<argument flag="">s/nx.*=.*/nx = 6,/g</argument>
 			<argument flag="">namelist.input</argument>
 		</step>
 		<step executable="sed">
 			<argument flag="">-i</argument>
+			<argument flag="">.bak</argument>
 			<argument flag="">s/ny.*=.*/ny = 30,/g</argument>
 			<argument flag="">namelist.input</argument>
 		</step>
 		<step executable="sed">
 			<argument flag="">-i</argument>
+			<argument flag="">.bak</argument>
 			<argument flag="">s/dc.*=.*/dc = 1000.0,/g</argument>
 			<argument flag="">namelist.input</argument>
 		</step>

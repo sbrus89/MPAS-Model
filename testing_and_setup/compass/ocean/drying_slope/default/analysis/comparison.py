@@ -54,13 +54,14 @@ def plot_data(rval='0.0025', dtime='0.05', datatype='analytical', *args, **kwarg
     measured=plt.scatter(data[0], data[1], *args, **kwargs)
 
 
-def plot_dataset(rval):
-    times = ['0.50', '0.05', '0.40', '0.15', '0.30', '0.25']
+def plot_datasets(rval, times):
     for ii, dtime in enumerate(times):
         plot_data(rval=rval, dtime = dtime, datatype = 'analytical',
                   marker = '.', color = 'b', label='analytical')
         plot_data(rval=rval, dtime = dtime, datatype = 'roms',
                   marker = '.', color = 'g', label='ROMS')
+        plot_MPASO([dtime], 'k-', lw=0.5, label='MPAS-O')
+
         if ii == 0:
             plt.legend(frameon=False, loc='lower left')
             place_time_labels(times)
@@ -72,17 +73,30 @@ def place_time_labels(times):
     for atime, ay in zip(times, locs):
         plt.text(25.2, ay, atime + ' days', size=8)
 
+def plot_MPASO(times, *args, **kwargs):
+    for atime in times:
+        plottime = int(float(atime)*24.0/1.2)
+        print('{} {}'.format(atime, plottime))
+        ds = xr.open_mfdataset('output.nc')
+        ds = ds.drop(np.setdiff1d(ds.variables.keys(), ['yCell','ssh']))
+        ymean = ds.isel(Time=plottime).groupby('yCell').mean()
+        x = ymean.yCell.values/1000.0
+        y = ymean.ssh.values
+        #print('ymin={} ymax={}\n{}\n{}'.format(y.min(), y.max(),x, y))
+        plt.plot(x, -y, *args, **kwargs)
+        ds.close()
 
 def main():
     setup_fig()
+    times = ['0.50', '0.05', '0.40', '0.15', '0.30', '0.25']
 
     ############### subplot r = 0.0025 ###############
     upper_plot()
-    plot_dataset(rval='0.0025')
+    plot_datasets(rval='0.0025', times=times)
 
     ############### subplot r = 0.01   ###############
     lower_plot()
-    plot_dataset(rval='0.01')
+    plot_datasets(rval='0.01', times=times)
 
 
     # data from MPAS-O on boundary
