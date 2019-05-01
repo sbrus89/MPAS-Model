@@ -79,7 +79,7 @@ def plot_MPASO(times, *args, **kwargs):
         print('{} {}'.format(atime, plottime))
         ds = xr.open_mfdataset('output.nc')
         ds = ds.drop(np.setdiff1d(ds.variables.keys(), ['yCell','ssh']))
-        ymean = ds.isel(Time=plottime).groupby('yCell').mean()
+        ymean = ds.isel(Time=plottime).groupby('yCell').mean(dim=xr.ALL_DIMS)
         x = ymean.yCell.values/1000.0
         y = ymean.ssh.values
         #print('ymin={} ymax={}\n{}\n{}'.format(y.min(), y.max(),x, y))
