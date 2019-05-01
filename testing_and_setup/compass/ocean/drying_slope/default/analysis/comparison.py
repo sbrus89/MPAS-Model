@@ -76,7 +76,7 @@ def place_time_labels(times):
 def plot_MPASO(times, *args, **kwargs):
     for atime in times:
         plottime = int(float(atime)*24.0/1.2)
-        print('{} {}'.format(atime, plottime))
+        #print('{} {}'.format(atime, plottime))
         ds = xr.open_mfdataset('output.nc')
         ds = ds.drop(np.setdiff1d(ds.variables.keys(), ['yCell','ssh']))
         ymean = ds.isel(Time=plottime).groupby('yCell').mean(dim=xr.ALL_DIMS)
@@ -86,28 +86,47 @@ def plot_MPASO(times, *args, **kwargs):
         plt.plot(x, -y, *args, **kwargs)
         ds.close()
 
+
+def plot_tidal_forcing_comparison():
+    # data from MPAS-O on boundary
+    ds = xr.open_mfdataset('output.nc')
+    ympas = ds.ssh.where(ds.tidalInputMask).mean('nCells').values
+    x = np.linspace(0, 1.0, len(ds.xtime))*12.0
+    plt.plot(x, ympas, marker='o', label='MPAS-O')
+    
+    # analytical case
+    x = np.linspace(0,12.0,100)
+    y = 10.0*np.sin(x*np.pi/12.0) - 10.0
+    plt.plot(x, y, lw=3, color='black', label='analytical')
+   
+    plt.legend(frameon=False)
+    plt.ylabel('Tidal amplitude (m)')
+    plt.xlabel('Time (hrs)')
+    plt.suptitle('Drying slope comparison tidal amplitude between MPAS-O and analytical')
+    plt.savefig('tidalcomparison.png')
+
+
 def main():
+    ################ plot tidal forcing comparison ###############
+    plot_tidal_forcing_comparison()
+    ##############################################################
+    
+    ################ plot drying front comparison ###############
     setup_fig()
     times = ['0.50', '0.05', '0.40', '0.15', '0.30', '0.25']
 
-    ############### subplot r = 0.0025 ###############
+    # subplot r = 0.0025 
     upper_plot()
     plot_datasets(rval='0.0025', times=times)
 
-    ############### subplot r = 0.01   ###############
+    # subplot r = 0.01
     lower_plot()
     plot_datasets(rval='0.01', times=times)
 
-
-    # data from MPAS-O on boundary
-    #ds = xr.open_mfdataset('output.nc')
-    #ds.ssh.where(ds.tidalInputMask).mean('nCells').plot(marker='o', label='MPAS-O')
-
-
     plt.suptitle('Drying slope comparison between MPAS-O, analytical, and ROMS')
-
     plt.savefig('dryingslopecomparison.png')
-
+    ##############################################################
+    
 
 if __name__ == "__main__":
     main()
