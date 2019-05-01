@@ -199,6 +199,9 @@ contains
       real (kind=RKIND), pointer :: config_use_tidal_forcing_tau
       character (len=StrKIND), pointer :: config_tidal_forcing_type
       character (len=StrKIND), pointer :: config_tidal_forcing_model
+      logical, pointer :: config_use_wetting_drying
+      real (kind=RKIND), pointer :: config_drying_min_cell_height
+      real (kind=RKIND), dimension(:), pointer :: bottomDepth
 
       integer :: iCell, k, nCells
       integer, dimension(:), pointer :: nCellsArray
@@ -241,6 +244,13 @@ contains
       call mpas_pool_get_config(ocnConfigs, 'config_use_tidal_forcing_tau', &
                                              config_use_tidal_forcing_tau)
 
+      ! wetting and drying considerations
+      call mpas_pool_get_config(ocnConfigs, 'config_use_wetting_drying', &
+                                             config_use_wetting_drying)
+      call mpas_pool_get_config(ocnConfigs, 'config_drying_min_cell_height', &
+                                             config_drying_min_cell_height)
+
+      call mpas_pool_get_array(meshPool, 'bottomDepth', bottomDepth)
       call mpas_pool_get_array(meshPool, 'maxLevelCell', maxLevelCell)
       call mpas_pool_get_dimension(meshPool, 'nCellsArray', nCellsArray)
 
@@ -260,6 +270,12 @@ contains
         !  ! pass
         else
           tidalHeight = 0.0_RKIND
+        end if
+
+        ! ensure tidalHeight can't push flow below anticipated minimum
+        if (config_use_wetting_drying) then
+          ! ensure that tidal height can't force below total minimum thickness
+          tidalHeight = max(-bottomDepth(iCell) + maxLevelCell(iCell)*config_drying_min_cell_height, tidalHeight)
         end if
 
         ! compute total depth for relative thickness contribution
