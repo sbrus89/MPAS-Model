@@ -111,15 +111,18 @@ contains
                                         config_vertical_grid, &
                                         config_tidal_boundary_layer_type
     logical, pointer :: config_tidal_boundary_use_distances, config_alter_ICs_for_pbcs
+    logical, pointer :: config_use_wetting_drying, config_tidal_start_dry
     real (kind=RKIND), pointer :: config_tidal_boundary_right_bottom_depth, &
                                   config_tidal_boundary_left_bottom_depth, &
                                   config_tidal_boundary_plug_width_dist, config_tidal_boundary_plug_width_frac, &
                                   config_tidal_boundary_plug_temperature, config_tidal_boundary_domain_temperature, &
                                   config_tidal_boundary_salinity, config_tidal_boundary_isopycnal_min_thickness, &
-                                  config_tidal_boundary_water_thickness
+                                  config_tidal_boundary_water_thickness, &
+                                  config_drying_min_cell_height
 
 
     real (kind=RKIND), dimension(:), pointer :: interfaceLocations
+    real (kind=RKIND),  parameter :: eps=1.0e-12
 
     iErr = 0
 
@@ -138,6 +141,10 @@ contains
     call mpas_pool_get_config(ocnConfigs, 'config_tidal_boundary_domain_temperature', config_tidal_boundary_domain_temperature)
     call mpas_pool_get_config(ocnConfigs, 'config_tidal_boundary_salinity', config_tidal_boundary_salinity)
     call mpas_pool_get_config(ocnConfigs, 'config_alter_ICs_for_pbcs', config_alter_ICs_for_pbcs)
+
+    call mpas_pool_get_config(ocnConfigs, 'config_tidal_start_dry', config_tidal_start_dry)
+    call mpas_pool_get_config(ocnConfigs, 'config_use_wetting_drying', config_use_wetting_drying)
+    call mpas_pool_get_config(ocnConfigs, 'config_drying_min_cell_height', config_drying_min_cell_height)
 
     call mpas_pool_get_subpool(domain % blocklist % structs, 'mesh', meshPool)
     call mpas_pool_get_dimension(meshPool, 'nVertLevelsP1', nVertLevelsP1)
@@ -223,6 +230,11 @@ contains
           + (yCell(iCell) - yMin) / (yMax - yMin)  * &
           (config_tidal_boundary_right_bottom_depth - config_tidal_boundary_left_bottom_depth)
 
+        if (config_use_wetting_drying .and. config_tidal_start_dry) then
+          ! make sure bottomDepth not smaller than 3 layers)
+          bottomDepth(iCell) = max(refBottomDepth(2), bottomDepth(iCell))
+        end if
+
         if (.not. config_alter_ICs_for_pbcs) then
           do k = 1,nVertLevels
             if (refBottomDepth(k) > bottomDepth(iCell)) then
@@ -262,6 +274,10 @@ contains
 
       do iCell = 1, nCellsSolve
         ssh(iCell) = 0.0_RKIND
+
+        if (config_use_wetting_drying .and. config_tidal_start_dry) then
+          ssh(iCell) = -bottomDepth(iCell) + config_drying_min_cell_height*maxLevelCell(iCell)
+        end if
       end do
 
       do iCell = 1, nCellsSolve
@@ -288,15 +304,23 @@ contains
       end do
 
       do iCell = 1, nCellsSolve
-        ! Set layerThickness and restingThickness
-        call ocn_compute_layerThickness_zMid_from_bottomDepth(layerThickness(:,iCell), zMid(:,iCell), &
-          refBottomDepth, bottomDepth(iCell), maxLevelCell(iCell), nVertLevels, iErr, &
-          restingThickness=restingThickness(:,iCell), &
-          ssh=ssh(iCell))
-        ! also computes zMid
-        do k = 1, maxLevelCell(iCell)
-          restingThickness(k, iCell) = layerThickness(k, iCell)
-        end do
+        if (config_use_wetting_drying .and. config_tidal_start_dry) then
+          ! also computes zMid
+          do k = 1, maxLevelCell(iCell)
+            layerThickness(k,iCell) = (ssh(iCell) + bottomDepth(iCell))/maxLevelCell(iCell)
+            restingThickness(k, iCell) = bottomDepth(iCell)/maxLevelCell(iCell)
+          end do
+        else
+          ! Set layerThickness and restingThickness
+          call ocn_compute_layerThickness_zMid_from_bottomDepth(layerThickness(:,iCell), zMid(:,iCell), &
+            refBottomDepth, bottomDepth(iCell), maxLevelCell(iCell), nVertLevels, iErr, &
+            restingThickness=restingThickness(:,iCell), &
+            ssh=ssh(iCell))
+          ! also computes zMid
+          do k = 1, maxLevelCell(iCell)
+            restingThickness(k, iCell) = layerThickness(k, iCell)
+          end do
+        end if
 
         ! Set salinity
         if ( associated(activeTracers) ) then

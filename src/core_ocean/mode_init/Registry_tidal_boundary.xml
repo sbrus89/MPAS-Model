@@ -7,6 +7,10 @@
 			description="Depth of the bottom of the ocean in northern-most end."
 			possible_values="Any positive real value greater than 0."
 		/>
+		<nml_option name="config_tidal_start_dry" type="logical" default_value="false" units="m"
+			description="Logical to determine if channel should be started dry."
+			possible_values="True or False"
+		/>
 		<nml_option name="config_tidal_boundary_left_bottom_depth" type="real" default_value="10.0" units="m"
 			description="Depth of the bottom of the ocean in southern-most end."
 			possible_values="Any positive real value greater than 0."
