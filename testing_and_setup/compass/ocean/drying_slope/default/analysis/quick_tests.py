@@ -17,7 +17,7 @@ plt.plot(x, y, 'k-', lw=2, label='initial')
 
 ds = xr.open_mfdataset('output.nc')
 
-for atime in np.arange(len(ds.Time))[:5]:
+for atime in np.arange(len(ds.Time)):
     ds = ds.drop(np.setdiff1d(ds.variables.keys(), ['yCell','ssh','xtime']))
     ymean = ds.isel(Time=atime).groupby('yCell').mean(dim=xr.ALL_DIMS)
     x = ymean.yCell.values/1000.0
@@ -25,6 +25,9 @@ for atime in np.arange(len(ds.Time))[:5]:
     timelabel = str(ds.xtime.isel(Time=atime).values).strip()[11:]
     print('Doing {}'.format(timelabel))
     plt.plot(x, y, label=timelabel)
+
+plt.ylim(-12,-6)
+plt.xlim(20,28)
 
 plt.legend(fontsize=8)
 plt.savefig('test_time_adv.png')

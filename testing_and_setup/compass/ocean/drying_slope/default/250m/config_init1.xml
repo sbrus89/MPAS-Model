@@ -76,7 +76,7 @@
 		<step executable="sed">
 			<argument flag="">-i</argument>
 			<argument flag="">.bak</argument>
-			<argument flag="">s/ny.*=.*/ny = 120,/g</argument>
+			<argument flag="">s/ny.*=.*/ny = 116,/g</argument>
 			<argument flag="">namelist.input</argument>
 		</step>
 		<step executable="sed">
