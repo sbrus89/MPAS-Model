@@ -54,13 +54,13 @@ def plot_data(rval='0.0025', dtime='0.05', datatype='analytical', *args, **kwarg
     measured=plt.scatter(data[0], data[1], *args, **kwargs)
 
 
-def plot_datasets(rval, times):
+def plot_datasets(rval, times, fileno):
     for ii, dtime in enumerate(times):
         plot_data(rval=rval, dtime = dtime, datatype = 'analytical',
                   marker = '.', color = 'b', label='analytical')
         plot_data(rval=rval, dtime = dtime, datatype = 'roms',
                   marker = '.', color = 'g', label='ROMS')
-        plot_MPASO([dtime], 'k-', lw=0.5, label='MPAS-O')
+        plot_MPASO([dtime], fileno, 'k-', lw=0.5, label='MPAS-O')
 
         if ii == 0:
             plt.legend(frameon=False, loc='lower left')
@@ -73,11 +73,11 @@ def place_time_labels(times):
     for atime, ay in zip(times, locs):
         plt.text(25.2, ay, atime + ' days', size=8)
 
-def plot_MPASO(times, *args, **kwargs):
+def plot_MPASO(times, fileno, *args, **kwargs):
     for atime in times:
         plottime = int(float(atime)*24.0/1.2)
         #print('{} {}'.format(atime, plottime))
-        ds = xr.open_mfdataset('output.nc')
+        ds = xr.open_mfdataset('output'+ fileno + '.nc')
         ds = ds.drop(np.setdiff1d(ds.variables.keys(), ['yCell','ssh']))
         ymean = ds.isel(Time=plottime).groupby('yCell').mean(dim=xr.ALL_DIMS)
         x = ymean.yCell.values/1000.0
@@ -89,20 +89,21 @@ def plot_MPASO(times, *args, **kwargs):
 
 def plot_tidal_forcing_comparison():
     # data from MPAS-O on boundary
-    ds = xr.open_mfdataset('output.nc')
-    ympas = ds.ssh.where(ds.tidalInputMask).mean('nCells').values
-    x = np.linspace(0, 1.0, len(ds.xtime))*12.0
-    plt.plot(x, ympas, marker='o', label='MPAS-O')
-    
+    for fileno in ['1','2']:
+        ds = xr.open_mfdataset('output' + fileno +'.nc')
+        ympas = ds.ssh.where(ds.tidalInputMask).mean('nCells').values
+        x = np.linspace(0, 1.0, len(ds.xtime))*12.0
+        plt.plot(x, ympas, marker='o', label='MPAS-O forward' + fileno)
+
     # analytical case
     x = np.linspace(0,12.0,100)
     y = 10.0*np.sin(x*np.pi/12.0) - 10.0
     plt.plot(x, y, lw=3, color='black', label='analytical')
-   
+
     plt.legend(frameon=False)
     plt.ylabel('Tidal amplitude (m)')
     plt.xlabel('Time (hrs)')
-    plt.suptitle('Drying slope comparison tidal amplitude between MPAS-O and analytical')
+    plt.suptitle('Tidal amplitude forcing (right side) for MPAS-O and analytical')
     plt.savefig('tidalcomparison.png')
 
 
@@ -110,23 +111,23 @@ def main():
     ################ plot tidal forcing comparison ###############
     plot_tidal_forcing_comparison()
     ##############################################################
-    
+
     ################ plot drying front comparison ###############
     setup_fig()
     times = ['0.50', '0.05', '0.40', '0.15', '0.30', '0.25']
 
-    # subplot r = 0.0025 
+    # subplot r = 0.0025
     upper_plot()
-    plot_datasets(rval='0.0025', times=times)
+    plot_datasets(rval='0.0025', times=times, fileno='1')
 
     # subplot r = 0.01
     lower_plot()
-    plot_datasets(rval='0.01', times=times)
+    plot_datasets(rval='0.01', times=times, fileno='2')
 
     plt.suptitle('Drying slope comparison between MPAS-O, analytical, and ROMS')
     plt.savefig('dryingslopecomparison.png')
     ##############################################################
-    
+
 
 if __name__ == "__main__":
     main()
