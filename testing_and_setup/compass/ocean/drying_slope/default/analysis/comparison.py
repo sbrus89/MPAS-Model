@@ -54,18 +54,20 @@ def plot_data(rval='0.0025', dtime='0.05', datatype='analytical', *args, **kwarg
     measured=plt.scatter(data[0], data[1], *args, **kwargs)
 
 
-def plot_datasets(rval, times, fileno):
+def plot_datasets(rval, times, fileno, plotdata=True):
     for ii, dtime in enumerate(times):
-        plot_data(rval=rval, dtime = dtime, datatype = 'analytical',
-                  marker = '.', color = 'b', label='analytical')
-        plot_data(rval=rval, dtime = dtime, datatype = 'roms',
-                  marker = '.', color = 'g', label='ROMS')
+        if plotdata:
+            plot_data(rval=rval, dtime = dtime, datatype = 'analytical',
+                      marker = '.', color = 'b', label='analytical')
+            plot_data(rval=rval, dtime = dtime, datatype = 'roms',
+                      marker = '.', color = 'g', label='ROMS')
         plot_MPASO([dtime], fileno, 'k-', lw=0.5, label='MPAS-O')
 
-        if ii == 0:
-            plt.legend(frameon=False, loc='lower left')
-            place_time_labels(times)
-            plt.text(0.5, 5, 'r = ' + str(rval))
+        if plotdata:
+            if ii == 0:
+                plt.legend(frameon=False, loc='lower left')
+                place_time_labels(times)
+                plt.text(0.5, 5, 'r = ' + str(rval))
 
 
 def place_time_labels(times):
@@ -78,7 +80,7 @@ def plot_MPASO(times, fileno, *args, **kwargs):
         plottime = int(float(atime)*24.0/1.2)
         #print('{} {}'.format(atime, plottime))
         ds = xr.open_mfdataset('output'+ fileno + '.nc')
-        ds = ds.drop(np.setdiff1d(ds.variables.keys(), ['yCell','ssh']))
+        ds = ds.drop(np.setdiff1d([i for i in ds.variables], ['yCell','ssh']))
         ymean = ds.isel(Time=plottime).groupby('yCell').mean(dim=xr.ALL_DIMS)
         x = ymean.yCell.values/1000.0
         y = ymean.ssh.values

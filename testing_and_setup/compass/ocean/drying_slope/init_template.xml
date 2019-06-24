@@ -2,6 +2,7 @@
 	<namelist>
 		<option name="config_ocean_run_mode">'init'</option>
 		<option name="config_init_configuration">'tidal_boundary'</option>
+		<option name="config_tidal_boundary_layer_type">'zstar'</option>
 		<option name="config_vert_levels">-1</option>
 		<option name="config_tidal_boundary_vert_levels">100</option>
 		<option name="config_tidal_boundary_left_bottom_depth">0.0</option>

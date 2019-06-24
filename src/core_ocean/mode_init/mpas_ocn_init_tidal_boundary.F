@@ -128,6 +128,7 @@ contains
 
 
     call mpas_pool_get_config(ocnConfigs, 'config_init_configuration', config_init_configuration)
+    call mpas_pool_get_config(ocnConfigs, 'config_tidal_boundary_layer_type', config_tidal_boundary_layer_type)
 
     call mpas_log_write('here')
     if(config_init_configuration .ne. trim('tidal_boundary')) return
@@ -229,37 +230,106 @@ contains
         bottomDepth(iCell) = config_tidal_boundary_left_bottom_depth &
           + (yCell(iCell) - yMin) / (yMax - yMin)  * &
           (config_tidal_boundary_right_bottom_depth - config_tidal_boundary_left_bottom_depth)
+      end do
 
-        if (config_use_wetting_drying .and. config_tidal_start_dry) then
+      if (config_use_wetting_drying .and. config_tidal_start_dry) then
+        do iCell = 1, nCellsSolve
           ! make sure bottomDepth not smaller than 3 layers)
           bottomDepth(iCell) = max(refBottomDepth(2), bottomDepth(iCell))
-        end if
+        end do
+      end if
 
-        if (.not. config_alter_ICs_for_pbcs) then
+      if (.not. config_alter_ICs_for_pbcs) then
+        do iCell = 1, nCellsSolve
           do k = 1,nVertLevels
             if (refBottomDepth(k) > bottomDepth(iCell)) then
               bottomDepth(iCell) = refBottomDepth(k)
               exit
             end if
           end do
-        end if
+        end do
+      end if
+
+      if(trim(config_tidal_boundary_layer_type) == 'zstar') then
 
         ! Determine maxLevelCell based on bottomDepth and refBottomDepth
         ! Also set botomDepth based on refBottomDepth, since
         ! above bottomDepth was set with continuous analytical functions,
         ! and needs to be discrete
+        do iCell = 1, nCellsSolve
         maxLevelCell(iCell) = nVertLevels
-        if (nVertLevels > 1) then
-          do k = 1, nVertLevels
-            if (bottomDepth(iCell) < refBottomDepth(k)) then
-              maxLevelCell(iCell) = k-1
-              bottomDepth(iCell) = refBottomDepth(k-1)
-              exit
-            end if
+          if (nVertLevels > 1) then
+            do k = 1, nVertLevels
+              if (bottomDepth(iCell) < refBottomDepth(k)) then
+                maxLevelCell(iCell) = k-1
+                bottomDepth(iCell) = refBottomDepth(k-1)
+                exit
+              end if
+            end do
+          end if
+
+          ssh(iCell) = 0.0_RKIND
+        end do
+
+        if (config_use_wetting_drying .and. config_tidal_start_dry) then
+          do iCell = 1, nCellsSolve
+
+            ssh(iCell) = -bottomDepth(iCell) + config_drying_min_cell_height*maxLevelCell(iCell)
+
+            ! also computes zMid
+            do k = 1, maxLevelCell(iCell)
+              layerThickness(k,iCell) = (ssh(iCell) + bottomDepth(iCell))/maxLevelCell(iCell)
+              restingThickness(k, iCell) = bottomDepth(iCell)/maxLevelCell(iCell)
+            end do
+          end do
+        else
+          do iCell = 1, nCellsSolve
+            ! Set layerThickness and restingThickness
+            call ocn_compute_layerThickness_zMid_from_bottomDepth(layerThickness(:,iCell), zMid(:,iCell), &
+              refBottomDepth, bottomDepth(iCell), maxLevelCell(iCell), nVertLevels, iErr, &
+              restingThickness=restingThickness(:,iCell), &
+              ssh=ssh(iCell))
+            ! also computes zMid
+            do k = 1, maxLevelCell(iCell)
+              restingThickness(k, iCell) = layerThickness(k, iCell)
+            end do
           end do
         end if
 
-      end do
+      else if (trim(config_tidal_boundary_layer_type) == 'sigma') then
+
+        do iCell = 1, nCellsSolve
+          maxLevelCell(iCell) = nVertLevels
+          ssh(iCell) = 0.0_RKIND
+        end do
+
+        if (config_use_wetting_drying .and. config_tidal_start_dry) then
+          do iCell = 1, nCellsSolve
+            ssh(iCell) = -bottomDepth(iCell) + config_drying_min_cell_height*maxLevelCell(iCell)
+            ! also computes zMid
+            do k = 1, maxLevelCell(iCell)
+              layerThickness(k,iCell) = (ssh(iCell) + bottomDepth(iCell))/maxLevelCell(iCell)
+              restingThickness(k, iCell) = 1.0_RKIND
+            end do
+          end do
+        else
+          do iCell = 1, nCellsSolve
+            ! Set layerThickness and restingThickness
+            call ocn_compute_layerThickness_zMid_from_bottomDepth(layerThickness(:,iCell), zMid(:,iCell), &
+              refBottomDepth, bottomDepth(iCell), maxLevelCell(iCell), nVertLevels, iErr, &
+              restingThickness=restingThickness(:,iCell), &
+              ssh=ssh(iCell))
+            ! also computes zMid
+            do k = 1, maxLevelCell(iCell)
+              restingThickness(k, iCell) = layerThickness(k, iCell)
+            end do
+          end do
+        end if
+
+      end if
+
+      ! Set vertCoordMovementWeights
+      vertCoordMovementWeights(:) = 1.0_RKIND
 
       ! Set tidal boundary mask
       do iCell = 1, nCellsSolve
@@ -272,17 +342,16 @@ contains
         end if
       end do
 
-      do iCell = 1, nCellsSolve
-        ssh(iCell) = 0.0_RKIND
+      ! Set salinity
+      if ( associated(activeTracers) ) then
+        do iCell = 1, nCellsSolve
+          activeTracers(index_salinity, :, iCell) = config_tidal_boundary_salinity
+        end do
+      end if
 
-        if (config_use_wetting_drying .and. config_tidal_start_dry) then
-          ssh(iCell) = -bottomDepth(iCell) + config_drying_min_cell_height*maxLevelCell(iCell)
-        end if
-      end do
-
-      do iCell = 1, nCellsSolve
-        ! Set temperature
-        if ( associated(activeTracers) ) then
+      ! Set temperature
+      if ( associated(activeTracers) ) then
+        do iCell = 1, nCellsSolve
           do k = 1, maxLevelCell(iCell)
             if(yCell(iCell) < yMinGlobal + plugWidth) then
               activeTracers(index_temperature, k, iCell) = config_tidal_boundary_plug_temperature
@@ -290,47 +359,21 @@ contains
               activeTracers(index_temperature, k, iCell) = config_tidal_boundary_domain_temperature
             end if
           end do
-          ! Set debug tracer to match plug onshore
-          if ( associated(debugTracers) ) then
-            do k = 1, maxLevelCell(iCell)
-              if(yCell(iCell) < (yMinGlobal + plugWidth)) then
-                debugTracers(index_tracer1, k, iCell) = 1.0_RKIND
-              else
-                debugTracers(index_tracer1, k, iCell) = 0.0_RKIND
-              end if
-            end do
-          end if
-        end if
-      end do
+        end do
+      end if
 
-      do iCell = 1, nCellsSolve
-        if (config_use_wetting_drying .and. config_tidal_start_dry) then
-          ! also computes zMid
+      ! Set debug tracer to match plug onshore
+      if ( associated(debugTracers) ) then
+        do iCell = 1, nCellsSolve
           do k = 1, maxLevelCell(iCell)
-            layerThickness(k,iCell) = (ssh(iCell) + bottomDepth(iCell))/maxLevelCell(iCell)
-            restingThickness(k, iCell) = bottomDepth(iCell)/maxLevelCell(iCell)
+            if(yCell(iCell) < (yMinGlobal + plugWidth)) then
+              debugTracers(index_tracer1, k, iCell) = 1.0_RKIND
+            else
+              debugTracers(index_tracer1, k, iCell) = 0.0_RKIND
+            end if
           end do
-        else
-          ! Set layerThickness and restingThickness
-          call ocn_compute_layerThickness_zMid_from_bottomDepth(layerThickness(:,iCell), zMid(:,iCell), &
-            refBottomDepth, bottomDepth(iCell), maxLevelCell(iCell), nVertLevels, iErr, &
-            restingThickness=restingThickness(:,iCell), &
-            ssh=ssh(iCell))
-          ! also computes zMid
-          do k = 1, maxLevelCell(iCell)
-            restingThickness(k, iCell) = layerThickness(k, iCell)
-          end do
-        end if
-
-        ! Set salinity
-        if ( associated(activeTracers) ) then
-          activeTracers(index_salinity, :, iCell) = config_tidal_boundary_salinity
-        end if
-
-      end do
-
-      ! Set vertCoordMovementWeights
-      vertCoordMovementWeights(:) = 1.0_RKIND
+        end do
+      end if
 
       block_ptr => block_ptr % next
     end do
