@@ -232,14 +232,15 @@ contains
           (config_tidal_boundary_right_bottom_depth - config_tidal_boundary_left_bottom_depth)
       end do
 
-      if (config_use_wetting_drying .and. config_tidal_start_dry) then
+      if (config_use_wetting_drying .and. config_tidal_start_dry .and. &
+          trim(config_tidal_boundary_layer_type) == 'zstar') then
         do iCell = 1, nCellsSolve
           ! make sure bottomDepth not smaller than 3 layers)
           bottomDepth(iCell) = max(refBottomDepth(2), bottomDepth(iCell))
         end do
       end if
 
-      if (.not. config_alter_ICs_for_pbcs) then
+      if (.not. config_alter_ICs_for_pbcs .and. trim(config_tidal_boundary_layer_type) == 'zstar') then
         do iCell = 1, nCellsSolve
           do k = 1,nVertLevels
             if (refBottomDepth(k) > bottomDepth(iCell)) then
@@ -300,7 +301,8 @@ contains
 
         do iCell = 1, nCellsSolve
           maxLevelCell(iCell) = nVertLevels
-          ssh(iCell) = 0.0_RKIND
+          ssh(iCell) = -1.0_RKIND
+          bottomDepth(iCell) = bottomDepth(iCell) + 1.0_RKIND
         end do
 
         if (config_use_wetting_drying .and. config_tidal_start_dry) then
@@ -309,7 +311,7 @@ contains
             ! also computes zMid
             do k = 1, maxLevelCell(iCell)
               layerThickness(k,iCell) = (ssh(iCell) + bottomDepth(iCell))/maxLevelCell(iCell)
-              restingThickness(k, iCell) = 1.0_RKIND
+              restingThickness(k, iCell) = bottomDepth(iCell)/maxLevelCell(iCell)
             end do
           end do
         else
