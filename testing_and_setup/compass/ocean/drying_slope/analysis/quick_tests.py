@@ -26,8 +26,8 @@ for atime in np.arange(len(ds.Time)):
     print('Doing {}'.format(timelabel))
     plt.plot(x, y, label=timelabel)
 
-plt.ylim(-12,-6)
-plt.xlim(20,28)
+plt.ylim(-12,0)
+plt.xlim(0,28)
 
 plt.legend(fontsize=8)
 plt.savefig('test_time_adv.png')
