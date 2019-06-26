@@ -275,10 +275,8 @@ contains
         ! ensure tidalHeight can't push flow below anticipated minimum
         if (config_use_wetting_drying .and. tidalInputMask(iCell) == 1.0_RKIND) then
           ! ensure that tidal height can't force below total minimum thickness
-          !write(*,*) 'tidalHeight old =', tidalHeight, maxLevelCell(iCell)
           ! condition wrong to ensure that there isn't any drying according to criteria
-          !tidalHeight = max(-bottomDepth(iCell) + maxLevelCell(iCell)*config_drying_min_cell_height, tidalHeight)
-          !write(*,*) 'tidalHeight new =', tidalHeight
+          tidalHeight = max(-bottomDepth(iCell) + (float(maxLevelCell(iCell))+1.0_RKIND)*config_drying_min_cell_height, tidalHeight)
         end if
 
         ! compute total depth for relative thickness contribution
