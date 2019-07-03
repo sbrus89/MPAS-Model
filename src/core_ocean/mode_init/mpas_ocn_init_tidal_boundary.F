@@ -301,8 +301,6 @@ contains
 
         do iCell = 1, nCellsSolve
           maxLevelCell(iCell) = nVertLevels
-          ssh(iCell) = -1.0_RKIND
-          bottomDepth(iCell) = bottomDepth(iCell) + 1.0_RKIND
         end do
 
         if (config_use_wetting_drying .and. config_tidal_start_dry) then
