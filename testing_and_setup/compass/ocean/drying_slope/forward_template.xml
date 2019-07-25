@@ -49,7 +49,7 @@
 			<attribute name="type">output</attribute>
 			<attribute name="clobber_mode">truncate</attribute>
 			<attribute name="filename_template">output.nc</attribute>
-			<attribute name="output_interval">0000-00-00_01:12:00</attribute>
+			<attribute name="output_interval">0000-00-00_00:12:00</attribute>
 			<add_contents>
 				<member type="stream" name="mesh"/>
 				<member type="var_struct" name="tracers"/>

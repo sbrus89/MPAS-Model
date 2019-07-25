@@ -15,6 +15,7 @@ import numpy as np
 import xarray as xr
 import matplotlib.pyplot as plt
 import pandas as pd
+from subprocess import call
 
 # render statically by default
 plt.switch_backend('agg')
@@ -54,14 +55,18 @@ def plot_data(rval='0.0025', dtime='0.05', datatype='analytical', *args, **kwarg
     measured=plt.scatter(data[0], data[1], *args, **kwargs)
 
 
-def plot_datasets(rval, times, fileno, plotdata=True):
+def plot_datasets(rval, times, fileno, plotdata=True, frame=False):
     for ii, dtime in enumerate(times):
         if plotdata:
             plot_data(rval=rval, dtime = dtime, datatype = 'analytical',
                       marker = '.', color = 'b', label='analytical')
             plot_data(rval=rval, dtime = dtime, datatype = 'roms',
                       marker = '.', color = 'g', label='ROMS')
-        plot_MPASO([dtime], fileno, 'k-', lw=0.5, label='MPAS-O')
+        if frame:
+            timeslice = times[frame]
+            plot_MPASO(timeslice, fileno, 'k-', lw=2, label='MPAS-O')
+        else:
+            plot_MPASO([dtime], fileno, 'k-', lw=0.5, label='MPAS-O')
 
         if plotdata:
             if ii == 0:
@@ -80,7 +85,8 @@ def plot_MPASO(times, fileno, *args, **kwargs):
         # factor of 1e-16 needed to account for annoying round-off issue to get right time slices
         plottime = int((float(atime)/0.2 + 1e-16)*24.0)
         ds = xr.open_mfdataset('output'+ fileno + '.nc')
-        print('{} {} {}'.format(atime, plottime, ds.isel(Time=plottime).xtime.values))
+        timestr = ds.isel(Time=plottime).xtime.values
+        #print('{} {} {}'.format(atime, plottime, timestr))
         ds = ds.drop(np.setdiff1d([i for i in ds.variables], ['yCell','ssh']))
         ymean = ds.isel(Time=plottime).groupby('yCell').mean(dim=xr.ALL_DIMS)
         x = ymean.yCell.values/1000.0
@@ -88,6 +94,7 @@ def plot_MPASO(times, fileno, *args, **kwargs):
         #print('ymin={} ymax={}\n{}\n{}'.format(y.min(), y.max(),x, y))
         plt.plot(x, -y, *args, **kwargs)
         ds.close()
+        return timestr
 
 
 def plot_tidal_forcing_comparison():
@@ -110,6 +117,22 @@ def plot_tidal_forcing_comparison():
     plt.savefig('tidalcomparison.png')
 
 
+def make_movie(moviename):
+   
+    # assumes automatic rewrite of the file
+    args = ['ffmpeg', '-y',
+            '-framerate', '6',
+            '-pattern_type', 'glob', 
+            '-i', moviename + '*.png',
+            '-c:v', 'libx264', 
+            '-r', '30',
+            '-profile:v', 'high',
+            '-crf', '20', 
+            '-pix_fmt', 'yuv420p', 
+            moviename +  '.mp4']
+    call(args)
+    
+
 def main():
     ################ plot tidal forcing comparison ###############
     plot_tidal_forcing_comparison()
@@ -130,6 +153,48 @@ def main():
     plt.suptitle('Drying slope comparison between MPAS-O, analytical, and ROMS')
     for outtype in ['.png','.pdf']:
         plt.savefig('dryingslopecomparison' + outtype)
+
+    ###################### make movie ##############################
+    ii = 0
+    frames = []
+    moviename = 'dryingslopecomparisonmovie'
+    for atime  in np.linspace(0,0.5,5*12+1):
+        # plot snapshots
+        print(atime)
+
+        # initialize movie frame
+        plt.close('all')
+        setup_fig()
+        # subplot r = 0.0025
+        upper_plot()
+        plot_datasets(rval='0.0025', times=times, fileno='1')
+
+        # subplot r = 0.01
+        lower_plot()
+        plot_datasets(rval='0.01', times=times, fileno='2')
+
+        # plot animated line on top image
+        # subplot r = 0.0025
+        upper_plot()
+        timestr = plot_MPASO([atime], '1', 'k-', lw=2.0, label='MPAS-O')
+        #plt.text(10, 10, 't = ' + str(timestr)[10:])
+        #plt.text(10, 10, 't = {:1.4f} days'.format(atime))
+
+        # subplot r = 0.01
+        lower_plot()
+        timestr = plot_MPASO([atime], '2', 'k-', lw=2.0, label='MPAS-O')
+        #plt.text(10, 10, 't = ' + str(timestr)[10:])
+        plt.text(10, 10, 't = {:1.2f} hrs'.format(atime*12))
+
+        plt.suptitle('Drying slope comparison between MPAS-O, analytical, and ROMS')
+        
+        framename = '{}{:03d}.png'.format(moviename,ii)
+        plt.savefig(framename)
+        
+        frames.append(framename)
+        ii += 1
+
+    make_movie(moviename)
     ##############################################################
 
 
