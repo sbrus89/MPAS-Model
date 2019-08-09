@@ -119,6 +119,7 @@ contains
                                   config_tidal_boundary_salinity, config_tidal_boundary_isopycnal_min_thickness, &
                                   config_tidal_boundary_water_thickness, &
                                   config_drying_min_cell_height
+    integer, pointer :: config_tidal_boundary_min_vert_levels
 
 
     real (kind=RKIND), dimension(:), pointer :: interfaceLocations
@@ -135,6 +136,7 @@ contains
 
     call mpas_pool_get_config(ocnConfigs, 'config_vertical_grid', config_vertical_grid)
 
+    call mpas_pool_get_config(ocnConfigs, 'config_tidal_boundary_min_vert_levels', config_tidal_boundary_min_vert_levels)
     call mpas_pool_get_config(ocnConfigs, 'config_tidal_boundary_right_bottom_depth', config_tidal_boundary_right_bottom_depth)
     call mpas_pool_get_config(ocnConfigs, 'config_tidal_boundary_left_bottom_depth', config_tidal_boundary_left_bottom_depth)
     call mpas_pool_get_config(ocnConfigs, 'config_tidal_boundary_plug_width_frac', config_tidal_boundary_plug_width_frac)
@@ -325,6 +327,53 @@ contains
             end do
           end do
         end if
+
+      else if (trim(config_tidal_boundary_layer_type) == 'hybird') then
+
+        do iCell = 1, nCellsSolve
+          maxLevelCell(iCell) = nVertLevels
+          if (nVertLevels > 1) then
+            do k = 1, nVertLevels
+              if (bottomDepth(iCell) < refBottomDepth(k)) then
+                if (k < config_tidal_boundary_min_vert_levels) then  
+                  ! Use sigma
+                  maxLevelCell(iCell) = config_tidal_boundary_min_vert_levels
+                  exit
+                else
+                  ! Use zstar
+                  maxLevelCell(iCell) = k-1
+                  bottomDepth(iCell) = refBottomDepth(k-1)
+                  exit
+                end if
+              end if
+            end do
+          end if
+
+          ssh(iCell) = 0.0_RKIND
+        end do
+
+        if (config_use_wetting_drying .and. config_tidal_start_dry) then                                     ! this is all repeated code
+          do iCell = 1, nCellsSolve                                                                          ! in the sigma, zstar, and hybird cases
+            ssh(iCell) = -bottomDepth(iCell) + config_drying_min_cell_height*maxLevelCell(iCell)             ! and should be cleaned up
+            ! also computes zMid                                                                             ! 
+            do k = 1, maxLevelCell(iCell)                                                                    !
+              layerThickness(k,iCell) = (ssh(iCell) + bottomDepth(iCell))/maxLevelCell(iCell)                !
+              restingThickness(k, iCell) = bottomDepth(iCell)/maxLevelCell(iCell)                            !
+            end do                                                                                           !
+          end do                                                                                             !
+        else                                                                                                 ! 
+          do iCell = 1, nCellsSolve                                                                          !
+            ! Set layerThickness and restingThickness                                                        !
+            call ocn_compute_layerThickness_zMid_from_bottomDepth(layerThickness(:,iCell), zMid(:,iCell), &  !
+              refBottomDepth, bottomDepth(iCell), maxLevelCell(iCell), nVertLevels, iErr, &                  !
+              restingThickness=restingThickness(:,iCell), &                                                  ! 
+              ssh=ssh(iCell))                                                                                ! 
+            ! also computes zMid                                                                             !
+            do k = 1, maxLevelCell(iCell)                                                                    ! 
+              restingThickness(k, iCell) = layerThickness(k, iCell)                                          !
+            end do                                                                                           !
+          end do                                                                                             ! 
+        end if                                                                                               !
 
       end if
 

@@ -3,6 +3,10 @@
 			description="Number of vertical levels in tidal_boundary test case. Typical values are 40 and 100."
 			possible_values="Any positive integer number greater than 0."
 		/>
+		<nml_option name="config_tidal_boundary_min_vert_levels" type="integer" default_value="10" units="unitless"
+			description="Number of vertical levels where zstar coordinates transition to sigma."
+			possible_values="Any positive integer number greater than 0."
+		/>
 		<nml_option name="config_tidal_boundary_layer_type" type="character" default_value="zstar" units="unitless"
 			description="Vertical coordinate to be used."
 			possible_values="'zstar', 'sigma'"
