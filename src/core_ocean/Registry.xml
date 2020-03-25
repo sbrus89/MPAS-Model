@@ -3840,4 +3840,5 @@
 #include "tracer_groups/Registry_tracers.xml"
 #include "analysis_members/Registry_analysis_members.xml"
 #include "mode_init/Registry.xml"
+#include "adc_mixing/Registry_adc_mixing_fields_opts.xml"
 </registry>
