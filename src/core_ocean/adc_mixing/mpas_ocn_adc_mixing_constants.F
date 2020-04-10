@@ -33,10 +33,7 @@ subroutine init_mixing_constants
     c11 = 0.1_RKIND
     B1 = 16.6_RKIND
     Kt = 0.4_RKIND
-  grav = 9.806
   sigmat = 0.72_RKIND
-  cp = 3996.0
-  rho0 = 1000.0
   kappa_FL = 0.0_RKIND
   kappa_w3 = 0.0_RKIND
   kappa_VAR = 0.0_RKIND

@@ -1,8 +1,74 @@
-module adc
+!|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+!
+!  ocn_adc_mixing
+!
+!> \brief mass flux closure for vertical turbulent fluxes 
+!> \author Luke Van Roekel
+!> \date   March 2020
+!> \details
+!>  mass flux closure for vertical turbulent fluxes 
+!>
+!    New mixing closure that is reynolds averaged navier stokes, where 
+!     high order terms are closed via a pdf closure (Garanaik et al 2020)
+!-----------------------------------------------------------------------
 
-  use netcdf
+module ocn_adc_mixing
+
+  use mpas_derived_types
+  use mpas_pool_routines
+  use mpas_dmpar
+  use mpas_timekeeping
+  use mpas_stream_manager
+
+  use ocn_constants
+  use ocn_diagnostic_routines
+  use ocn_configs
 
   implicit none
+  private :: swap_time_levels
+
+  save
+
+   !--------------------------------------------------------------------
+   !
+   ! Public member functions
+   !
+   !--------------------------------------------------------------------
+  public :: ocn_init_adc, &
+            ocn_compute_adc_mixing
+
+  real (kind=RKIND),dimension(:,:), pointer :: zmid, zedge, KspsU, KspsD, eps, length, lenspsD, &
+    KhU, KhD, KmU, KmD, wt_spsU, wt_spsD, ws_spsU, ws_spsD, lenspsU, &
+    sigma, Entrainment, Detrainment, w2tend1, w2tend2, w2tend3, w2tend4, &
+    w2tend5, w3tend, w3tend1, w3tend2, w3tend3, w3tend4, w3tend5, &
+    wttend1, wttend2, wttend3, wttend4, wttend5, &
+    t2tend1, t2tend2, t2tend3,  &
+    tumd, sumd, wumd, Mc, uw2, vw2, u2w, &
+    wstend1, wstend2, wstend3, wstend4, wstend5, &
+    v2w, w2t, w2s, wts, uvw, uwt, vwt, uws, vws, ws2, wt2,      &
+    uwtend,vwtend,u2tend,v2tend,ustend,vstend,uttend,vttend,    &
+    uvtend,u2tend1,u2tend2,u2tend3,u2tend4,u2tend5,     &
+    uwtend1,uwtend2,uwtend3,uwtend4,uwtend5, u2cliptend,        &
+    v2cliptend, w2cliptend,v2tend1,v2tend2,v2tend3,v2tend4,v2tend5
+
+
+
+
+  type (mpas_pool_type), pointer :: adcDiagnosticArraysPool, &
+                                    adcTendArraysPool, &
+                                    adcPrognosticArraysPool
+
+!for now pass the standard stuff and then load in the ADC array stuff, it could be a local copy on GPU
+!add wt, uw, vw, ws to arguments to pass in
+!if pointers live up here and I load in array in init, will it know about that for the whole thing?
+
+
+      call mpas_pool_get_subpool(domain % blocklist % structs, 'mixedLayerDepthsAM', mixedLayerDepthsAMPool)
+      call mpas_pool_get_subpool(domain % blocklist % structs, 'state', statePool)
+
+call mpas_pool_get_array(mixedLayerDepthsAMPool, 'tThreshMLD',tThreshMLD)
+
+
 
   logical :: defineFirst, stopflag
  type :: adc_mixing_constants
@@ -14,113 +80,34 @@ module adc
 
   integer :: record
   !declare all variables up here
-  real,allocatable,dimension(:,:) :: zmid, zedge, KspsU, KspsD, eps, epsnew, len, lenspsD, &
-    lenup, lendn, lenB, lenbuoy, lenblac, lenshea, tau, taunew, &
-    KhU, KhD, KmU, KmD, wt_spsU, wt_spsD, ws_spsU, ws_spsD, lenspsU, &
-    sigma, kappa, E, D, Ktend, KspsUtend, KspsDtend, Ktend1, &
-    Ktend2, Ktend3, w2tend, w2tend1, w2tend2, w2tend3, w2tend4, &
-    w2tend5, w3tend, w3tend1, w3tend2, w3tend3, w3tend4, w3tend5, &
-    wttend, wttend1, wttend2, wttend3, wttend4, wttend5, &
-    wttend6, t2tend, t2tend1, t2tend2, t2tend3,  &
-    wstend, s2tend, tstend, tumd, sumd, wumd, Mc, uw2, vw2, u2w, &
-    wstend1, wstend2, wstend3, wstend4, wstend5, &
-    v2w, w2t, w2s, wts, uvw, uwt, vwt, uws, vws, ws2, wt2,      &
-    uwtend,vwtend,u2tend,v2tend,ustend,vstend,uttend,vttend,    &
-    uvtend,u2tend1,u2tend2,u2tend3,u2tend4,u2tend5,u2tend6,     &
-    uwtend1,uwtend2,uwtend3,uwtend4,uwtend5, u2cliptend,        &
-    v2cliptend, w2cliptend,v2tend1,v2tend2,v2tend3,v2tend4,v2tend5
-
-  real,allocatable,dimension(:,:,:) :: u2,v2,uw,vw,uv,w2,w3,w4, &
-    wt,t2,ut,vt,ws,s2,us,vs,ts,b2
-
+!add following to registry
   real,allocatable,dimension(:) :: boundaryLayerDepth
 
   real,parameter :: EPSILON = 1.0E-8
 
-  real :: fileTime
-
   integer :: i1,i2
 
-!  integer,parameter :: ntimes = 2
-
   contains
+
+!|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+!
+!  ocn_init_adc
+!
+!> \brief initialize the mass flux closure
+!> \author Luke Van Roekel
+!> \date   March 2020
+!> \details
+!>  mass flux closure for vertical turbulent fluxes 
+!>
+!    New mixing closure that is reynolds averaged navier stokes, where 
+!     high order terms are closed via a pdf closure (Garanaik et al 2020)
+!-----------------------------------------------------------------------
 
   subroutine init_adc(ntimes,nCells, nVertLevels)
 
   integer, intent(in) :: ntimes, nCells, nVertLevels
 
   integer :: k,iCell
-
-!  allocate all the variables, set some to zero and such
-  allocate(zmid(nVertLevels,nCells))
-  allocate(zedge(nVertLevels+1,nCells),lenblac(nVertLevels+1,nCells))
-  allocate(KspsU(nVertLevels+1,nCells),KspsD(nVertLevels+1,nCells))
-  allocate(eps(nVertLevels+1,nCells),epsnew(nVertLevels+1,nCells))
-  allocate(len(nVertLevels+1,nCells),lenspsD(nVertLevels+1,nCells))
-  allocate(lenspsU(nVertLevels+1,nCells))
-  allocate(lenup(nVertLevels+1,nCells),lendn(nVertLevels+1,nCells))
-  allocate(lenbuoy(nVertLevels+1,nCells),lenshea(nVertLevels+1,nCells))
-  allocate(tau(nVertLevels+1,nCells),taunew(nVertLevels+1,nCells))
-  allocate(KhU(nVertLevels+1,nCells), KhD(nVertLevels+1,nCells))
-  allocate(KmU(nVertLevels+1,nCells), KmD(nVertLevels+1,nCells))
-  allocate(u2(ntimes,nVertLevels+1,nCells), v2(ntimes,nVertLevels+1,nCells))
-  allocate(uw(ntimes,nVertLevels+1,nCells), vw(ntimes,nVertLevels+1,nCells))
-  allocate(uv(ntimes,nVertLevels+1,nCells), w2(ntimes,nVertLevels+1,nCells))
-  allocate(w3(ntimes,nVertLevels+1,nCells), w4(ntimes,nVertLevels+1,nCells))
-  allocate(wt(ntimes,nVertLevels+1,nCells), t2(ntimes,nVertLevels+1,nCells))
-  allocate(ut(ntimes,nVertLevels+1,nCells), vt(ntimes,nVertLevels+1,nCells))
-  allocate(wt_spsU(nVertLevels+1,nCells), wt_spsD(nVertLevels+1,nCells))
-  allocate(ws_spsU(nVertLevels+1,nCells), ws_spsD(nVertLevels+1,nCells))
-  allocate(ws(ntimes,nVertLevels+1,nCells), s2(ntimes,nVertLevels+1,nCells))
-  allocate(us(ntimes,nVertLevels+1,nCells), vs(ntimes,nVertLevels+1,nCells))
-  allocate(ts(ntimes,nVertLevels+1,nCells), b2(ntimes,nVertLevels+1,nCells))
-  allocate(uw2(nVertLevels,nCells), vw2(nVertLevels,nCells))
-  allocate(uvw(nVertLevels,nCells), u2w(nVertLevels,nCells))
-  allocate(v2w(nVertLevels,nCells), uwt(nVertLevels,nCells))
-  allocate(vwt(nVertLevels,nCells), w2t(nVertLevels,nCells))
-  allocate(uws(nVertLevels,nCells), w2s(nVertLevels,nCells))
-  allocate(ws2(nVertLevels,nCells), wts(nVertLevels,nCells))
-  allocate(wumd(nVertLevels+1,nCells), tumd(nVertLevels+1,nCells))
-  allocate(sumd(nVertLevels+1,nCells), Mc(nVertLevels+1,nCells))
-  allocate(vws(nVertLevels,nCells), u2cliptend(nVertLevels+1,nCells))
-  allocate(v2cliptend(nVertLevels+1,nCells),w2cliptend(nVertLevels+1,nCells))
-
-  allocate(sigma(nVertLevels+1,nCells),kappa(nVertLevels+1,nCells))
-  allocate(E(nVertLevels+1,nCells))
-  allocate(D(nVertLevels+1,nCells), Ktend(nVertLevels+1,nCells))
-  allocate(KspsUtend(nVertLevels+1,nCells), KspsDtend(nVertLevels+1,nCells))
-  allocate(Ktend1(nVertLevels+1,nCells), Ktend2(nVertLevels+1,nCells))
-  allocate(ktend3(nVertLevels+1,nCells), w2tend(nVertLevels+1,nCells))
-  allocate(w2tend1(nVertLevels+1,nCells), w2tend2(nVertLevels+1,nCells))
-  allocate(w2tend3(nVertLevels+1,nCells), w2tend4(nVertLevels+1,nCells))
-  allocate(w2tend5(nVertLevels+1,nCells), w3tend1(nVertLevels+1,nCells))
-  allocate(w3tend2(nVertLevels+1,nCells), w3tend(nVertLevels+1,nCells))
-  allocate(w3tend3(nVertLevels+1,nCells), w3tend4(nVertLevels+1,nCells))
-  allocate(w3tend5(nVertLevels+1,nCells), wttend(nVertLevels+1,nCells))
-  allocate(wttend1(nVertLevels+1,nCells), wttend2(nVertLevels+1,nCells))
-  allocate(wttend3(nVertLevels+1,nCells), wttend4(nVertLevels+1,nCells))
-  allocate(wttend5(nVertLevels+1,nCells), wttend6(nVertLevels+1,nCells))
-  allocate(t2tend(nVertLevels+1,nCells), t2tend1(nVertLevels+1,nCells))
-  allocate(t2tend2(nVertLevels+1,nCells), t2tend3(nVertLevels+1,nCells))
-  allocate(wstend(nVertLevels+1,nCells), s2tend(nVertLevels+1,nCells))
-  allocate(wstend1(nVertLevels+1,nCells), wstend2(nVertLevels+1,nCells))
-  allocate(wstend3(nVertLevels+1,nCells), wstend4(nVertLevels+1,nCells))
-  allocate(wstend5(nVertLevels+1,nCells))
-  allocate(tstend(nVertLevels+1,nCells), uwtend(nVertLevels+1,nCells))
-  allocate(vwtend(nVertLevels+1,nCells), u2tend(nVertLevels+1,nCells))
-  allocate(v2tend(nVertLevels+1,nCells), uvtend(nVertLevels+1,nCells))
-  allocate(uttend(nVertLevels+1,nCells), vttend(nVertLevels+1,nCells))
-  allocate(ustend(nVertLevels+1,nCells), vstend(nVertLevels+1,nCells))
-  allocate(u2tend1(nVertLevels+1,nCells), u2tend2(nVertLevels+1,nCells))
-  allocate(u2tend3(nVertLevels+1,nCells), u2tend4(nVertLevels+1,nCells))
-  allocate(u2tend5(nVertLevels+1,nCells), u2tend6(nVertLevels+1,nCells))
-  allocate(boundaryLayerDepth(nCells))
-  allocate(v2tend1(nVertLevels+1,nCells), v2tend2(nVertLevels+1,nCells))
-  allocate(v2tend3(nVertLevels+1,nCells), v2tend4(nVertLevels+1,nCells))
-  allocate(v2tend5(nVertLevels+1,nCells))
-  allocate(uwtend1(nVertLevels+1,nCells), uwtend2(nVertLevels+1,nCells))
-  allocate(uwtend3(nVertLevels+1,nCells), uwtend4(nVertLevels+1,nCells))
-  allocate(uwtend5(nVertLevels+1,nCells))
 
   do iCell=1,nCells
 
@@ -157,6 +144,27 @@ module adc
   i2 = 2
   defineFirst = .true.
   end subroutine init_adc
+
+!|||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||
+!
+!  ocn_compute_adc_mixing
+!
+!> \brief compute turbulent fluxes from the mass flux closure 
+!> \author Luke Van Roekel
+!> \date   March 2020
+!> \details
+!>  mass flux closure for vertical turbulent fluxes 
+!>
+!    New mixing closure that is reynolds averaged navier stokes, where 
+!     high order terms are closed via a pdf closure (Garanaik et al 2020)
+!-----------------------------------------------------------------------
+
+  subroutine ocn_compute_adc_mixing(   )
+
+
+
+  end subroutine ocn_compute_adc_mixing
+
 
   subroutine swap_time_levels
 
@@ -254,7 +262,7 @@ module adc
     integer :: i,k, ij
 
     real,dimension(nVertLevels) :: B, Bup, Bdo
-    real,dimension(nVertLevels+1) :: tke, BupEdge, BdoEdge
+    real,dimension(nVertLevels+1) :: tke, BupEdge, BdoEdge, Bedge
     real :: sav, tudav, sudav, Tup, Tdo, Sup, Sdo
     real :: s1, z1, zV, sumv, minlen
 
@@ -279,14 +287,17 @@ module adc
           if(k>1) THEN
              BupEdge(k) = 0.5*(Bup(k-1) + Bup(k))
              BdoEdge(k) = 0.5*(Bdo(k-1) + Bdo(k))
+             Bedge(k) = 0.5*(B(k-1) + B(k))
           endif
        enddo
 
        BdoEdge(nVertLevels+1) = BdoEdge(nVertLevels)
        BupEdge(nVertLevels+1) = BupEdge(nVertLevels)
+       Bedge(nVertLevels+1) = Bedge(nVertLevels)
 
-       BdoEdge(1) = BdoEdge(2)
-       BupEdge(1) = BupEdge(2)
+       BdoEdge(1) = Bdo(1)
+       BupEdge(1) = Bup(1)
+       Bedge(1) = B(1)
 
        do k=2,nVertLevels
 
@@ -294,25 +305,26 @@ module adc
           ij=k
           lenup(k,i) = 0
           do while(sumv <= tke(k) .and. ij < nVertLevels+1)
-             sumv = sumv + (BupEdge(k) - Bup(ij))*(zedge(ij,i)-zedge(ij+1,i))**2/2.
+             sumv = sumv + (Bedge(k) - Bedge(ij+1))*(zedge(ij,i)-zedge(ij+1,i))
              lenup(k,i) =  lenup(k,i) + abs(zedge(ij,i)-zedge(ij+1,i))
              ij = ij + 1
 
              if(sumv > tke(k)) THEN
                 ij = ij - 1
-!                s1 = sumv
-!                z1 = zedge(ij+1,i)
-!                zV = zedge(ij,i)
-                sumv = sumv - (BupEdge(k) - Bup(ij))*(zedge(ij,i)-zedge(ij+1,i))**2/2.
+                s1 = sumv
+                z1 = zedge(ij+1,i)
+                zV = zedge(ij,i)
+                sumv = sumv - (Bedge(k) - Bedge(ij+1))*(zedge(ij,i)-zedge(ij+1,i))
                 lenup(k,i) = lenup(k,i) - abs(zedge(ij,i)-zedge(ij+1,i))
 !                lenup(k,i) = max(0.55,lenup(k,i) + abs((z1-zV)/(s1 - sumv)*(tke(k)-sumv)))
-                if(Bup(k-1) - Bup(k) < 0) then 
+                if(B(k-1) - B(k) < 0) then 
                         minlen = abs(zmid(k-1,i) - zmid(k,i))
                 else
-                        minlen = 0.5
+                        minlen = 0.55
                 endif
-                lenup(k,i) = max(minlen, lenup(k,i) + sqrt(2.0/(BupEdge(k) -         &
-                                Bup(ij-1))*(tke(k) - sumv)))
+              !  lenup(k,i) = max(minlen, lenup(k,i) + sqrt(2.0/(BupEdge(k) -         &
+              !                  Bup(ij))*(tke(k) - sumv)))
+                lenup(k,i) = max(minlen,lenup(k,i) + abs((z1-zV)/(s1 - sumv)*(tke(k)-sumv)))
                 exit   
              endif
 
@@ -323,16 +335,16 @@ module adc
         ij=k
         lendn(k,i) = 0
         do while(sumv <= tke(k) .and. ij>1)
-           sumv = sumv - (BdoEdge(k) - Bdo(ij-1))*(zedge(ij-1,i)-zedge(ij,i))**2./2.
+           sumv = sumv - (Bedge(k) - Bedge(ij-1))*(zedge(ij-1,i)-zedge(ij,i))
            lendn(k,i) = lendn(k,i) + abs(zedge(ij-1,i)-zedge(ij,i))
            ij = ij - 1
 
            if(sumv > tke(k)) THEN
               ij = ij + 1
-!              s1 = sumv
-!              z1 = zedge(ij,i)
-!              zV = zedge(ij-1,i)
-              sumv = sumv + (BdoEdge(k) - Bdo(ij-1))*(zedge(ij-1,i)-zedge(ij,i))**2./2.
+              s1 = sumv
+              z1 = zedge(ij,i)
+              zV = zedge(ij-1,i)
+              sumv = sumv + (Bedge(k) - Bedge(ij-1))*(zedge(ij-1,i)-zedge(ij,i))
               lendn(k,i) = lendn(k,i) - abs(zedge(ij-1,i)-zedge(ij,i))
 !              lendown(k) = max(0.55,lendown(k) + abs(-(z1-zV)/(sumv)*(tke(k))))
                 if(Bdo(k-1) - Bdo(k) < 0) then
@@ -340,8 +352,9 @@ module adc
                 else
                         minlen = 0.55
                 endif
-               lendn(k,i) = max(minlen,lendn(k,i) + sqrt(2.0/(BdoEdge(k) -  &
-                                Bdo(ij-1))*(tke(k) - sumv)))
+!               lendn(k,i) = max(minlen,lendn(k,i) + sqrt(2.0/(BdoEdge(k) -  &
+!                                Bdo(ij))*(tke(k) - sumv)))
+                lendn(k,i) = max(minlen,lendn(k,i)  + abs((z1-zV)/(s1 - sumv)*(tke(k)-sumv)))
               exit
            endif
         enddo
@@ -354,51 +367,6 @@ module adc
    len(nVertLevels+1,:) = 0.55
  
   end subroutine dissipation_lengths2
-
-  subroutine build_dissipation_lengths(nCells,nVertLevels,BVF)
-    integer,intent(in) :: nCells, nVertLevels
-    real,dimension(nVertLevels+1,nCells),intent(inout) :: BVF
-
-    real :: l, len1, len2, lenmax, KE, integrandTop, integrandBot
-
-    integer :: k,iCell
-
-    do iCell=1,nCells
-
-      integrandTop = 0.0
-      integrandBot = 0.0
-      do k=1,nvertLevels
-        KE = sqrt(0.5*(u2(i2,k,iCell) + v2(i2,k,iCell) + w2(i2,k,iCell))) 
-        integrandTop = integrandTop + 0.5*KE*abs(zedge(k,iCell)**2 - zedge(k+1,iCell)**2)
-        integrandBot = integrandBot + KE*(zedge(k,iCell) - zedge(k+1,iCell))
-      enddo
-
-      do k=2,nVertLevels
-        KE = 0.5*(u2(i2,k,iCell) + v2(i2,k,iCell) + w2(i2,k,iCell))
-
-        if(KE > EPSILON) then
-          lenmax = 0.53*sqrt(2.0*KE / (1.0E-15 + BVF(k,iCell)))
-        else
-          lenmax = 1.0e6
-        endif
-
-        len1 = 0.4*abs(zedge(k,iCell))
-        len2 = 0.2*integrandTop / (integrandBot + 1.0E-10)
-
-        lenbuoy(k,iCell) = len1
-        lenblac(k,iCell) = len2
-        lenshea(k,iCell) = lenmax
-        len(k,iCell) = min(1.0/(1.0 / len1 + 1.0 / len2),lenmax)
-        len(k,iCell) = max(len(k,iCell),0.55)
-      enddo
-      len(nVertLevels+1,iCell) = 1e-15
-!      len(1,iCell) = len(2,iCell) !1e-15
-    enddo
-    print *, '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
-    print *, len(:,1)
-    print *, '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
-
-  end subroutine build_dissipation_lengths
 
   subroutine build_sigma_updraft_properties(nCells,nVertLevels)
   !builds the updraft area function
@@ -436,6 +404,7 @@ module adc
     type(adc_mixing_constants) :: adcConst
 
     real :: wtav, McAv, sigav, tumdav, wumdav, sumdav, wb, bld, wstar
+    real :: w2av, t2av, wsav, s2av
     integer :: iCell,k
 
     do iCell=1,nCells
@@ -462,9 +431,18 @@ module adc
       !try new boundary condition derived from PDF
       sigav = 0.5*(sigma(1,iCell) + sigma(2,iCell))
       wtav = 0.5*(wt(tlev,1,iCell) + wt(tlev,2,iCell))
+      wsav = 0.5*(ws(tlev,1,iCell) + ws(tlev,2,iCell))
       McAv = 0.5*(w2(tlev,1,iCell) + w2(tlev,2,iCell))
       w2t(1,iCell) = (1.0 - 2.0*sigav)*wtav*sqrt(McAv) / (EPSILON + sigav*(1.0-sigav))
+      w2s(1,iCell) = (1.0 - 2.0*sigav)*wsav*sqrt(McAv) / (EPSILON + sigav*(1.0-sigav))
 
+      !limit based on schwarz inequality
+      t2av = 0.5*(t2(tlev,1,iCell) + t2(tlev,2,iCell))
+      s2av = 0.5*(s2(tlev,1,iCell) + s2(tlev,2,iCell))
+      w2av = 0.5*(w2(tlev,1,iCell) + w2(tlev,2,iCell))
+
+      w2t(1,iCell) = min(sqrt(w2av*(w2av*t2av + wtav*wtav)), sqrt(2.0*w2av*w2av*t2av), w2t(1,iCell))
+      w2s(1,iCell) = min(sqrt(w2av*(w2av*s2av + wsav*wsav)), sqrt(2.0*w2av*w2av*s2av), w2s(1,iCell))
       do k=2,nVertLevels
         sigav = 0.5*(sigma(k,iCell) + sigma(k+1,iCell))
         tumdav = 0.5*(tumd(k,iCell) + tumd(k+1,iCell))
@@ -472,6 +450,16 @@ module adc
         wumdav = 0.5*(wumd(k,iCell) + wumd(k+1,iCell))
         w2t(k,iCell) = sigav*(1.0 - sigav)*(1.0 - 2.0*sigav)*wumdav**2.0*tumdav
         w2s(k,iCell) = sigav*(1.0 - sigav)*(1.0 - 2.0*sigav)*wumdav**2.0*sumdav
+
+        !limit based on schwarz inequality
+        wtav = 0.5*(wt(tlev,k,iCell) + wt(tlev,k+1,iCell))
+        wsav = 0.5*(ws(tlev,k,iCell) + ws(tlev,k+1,iCell))
+        t2av = 0.5*(t2(tlev,k,iCell) + t2(tlev,k+1,iCell))
+        s2av = 0.5*(s2(tlev,k,iCell) + s2(tlev,k+1,iCell))
+        w2av = 0.5*(w2(tlev,k,iCell) + w2(tlev,k+1,iCell))
+
+        w2t(k,iCell) = min(sqrt(w2av*(w2av*t2av + wtav*wtav)), sqrt(2.0*w2av*w2av*t2av), w2t(k,iCell))
+        w2s(k,iCell) = min(sqrt(w2av*(w2av*s2av + wsav*wsav)), sqrt(2.0*w2av*w2av*s2av), w2s(k,iCell))
       enddo
 
     enddo
@@ -587,6 +575,7 @@ module adc
     real,dimension(nVertLevels,nCells) :: taupt, taups, taupv
     real :: B, Kps, Kpsp1, diff, lenav, Uz, Vz, Tz, Sz, sigav, sumdav
     real :: tumdav, Ksps
+    real :: w2av, u2av, v2av, uvav, uwav, vwav, wtav, wsav, utav, vtav, usav, vsav, t2av, s2av
     integer :: iCell, k
 
     do iCell=1,nCells
@@ -609,12 +598,48 @@ module adc
         vwt(k,iCell) = -diff*(vt(i1,k,iCell) - vt(i1,k+1,iCell)) / (zedge(k,iCell) - zedge(k+1,iCell))
         uws(k,iCell) = -diff*(us(i1,k,iCell) - us(i1,k+1,iCell)) / (zedge(k,iCell) - zedge(k+1,iCell))
         vws(k,iCell) = -diff*(vs(i1,k,iCell) - vs(i1,k+1,iCell)) / (zedge(k,iCell) - zedge(k+1,iCell))
+
+        !check if scharz inequality violated for any TOMs
+        u2av = 0.5*(u2(i1,k,iCell) + u2(i1,k+1,iCell))
+        w2av = 0.5*(w2(i2,k,iCell) + w2(i2,k+1,iCell))
+        v2av = 0.5*(v2(i1,k,iCell) + v2(i1,k+1,iCell))
+        uwav = 0.5*(uw(i1,k,iCell) + uw(i1,k+1,iCell))
+        vwav = 0.5*(vw(i1,k,iCell) + vw(i1,k+1,iCell))
+        uvav = 0.5*(uv(i1,k,iCell) + uv(i1,k+1,iCell))
+        utav = 0.5*(ut(i1,k,iCell) + ut(i1,k+1,iCell))
+        vtav = 0.5*(vt(i1,k,iCell) + vt(i1,k+1,iCell))
+        wtav = 0.5*(wt(i1,k,iCell) + wt(i1,k+1,iCell))
+        t2av = 0.5*(t2(i1,k,iCell) + t2(i1,k+1,iCell))
+        usav = 0.5*(us(i1,k,iCell) + us(i1,k+1,iCell))
+        vsav = 0.5*(vs(i1,k,iCell) + vs(i1,k+1,iCell))
+        wsav = 0.5*(ws(i1,k,iCell) + ws(i1,k+1,iCell))
+        s2av = 0.5*(s2(i1,k,iCell) + s2(i1,k+1,iCell))
+
+        u2w(k,iCell) = min(sqrt(u2av*(u2av*w2av + uwav**2.0)), sqrt(2.0*u2av**2.0*w2av), u2w(k,iCell))
+        v2w(k,iCell) = min(sqrt(v2av*(v2av*w2av + vwav**2.0)), sqrt(2.0*v2av**2.0*w2av), v2w(k,iCell))
+        uw2(k,iCell) = min(sqrt(2.0*u2av*w2av*w2av), sqrt(w2av*(u2av*w2av + uwav*uwav)), uw2(k,iCell))
+        vw2(k,iCell) = min(sqrt(2.0*v2av*w2av*w2av), sqrt(w2av*(v2av*w2av + vwav*vwav)), vw2(k,iCell))
+        uvw(k,iCell) = min(sqrt(u2av*(v2av*w2av + vwav*vwav)), sqrt(v2av*(u2av*w2av + uwav*uwav)), &
+                      sqrt(w2av*(u2av*v2av + uvav*uvav)), uvw(k,iCell))
+
+        uwt(k,iCell) = min(sqrt(u2av*(w2av*t2av + wtav*wtav)), sqrt(w2av*(u2av*t2av + utav*utav)), &
+                      sqrt(t2av*(u2av*w2av + uwav*uwav)), uwt(k,iCell))
+        vwt(k,iCell) = min(sqrt(v2av*(w2av*t2av + wtav*wtav)), sqrt(w2av*(v2av*t2av + vtav*vtav)), &
+                      sqrt(t2av*(v2av*w2av + vwav*vwav)), vwt(k,iCell))
+
+        uws(k,iCell) = min(sqrt(u2av*(w2av*s2av + wsav*wsav)), sqrt(w2av*(u2av*s2av + usav*usav)), &
+                      sqrt(s2av*(u2av*w2av + uwav*uwav)), uws(k,iCell))
+        vws(k,iCell) = min(sqrt(v2av*(w2av*s2av + wsav*wsav)), sqrt(w2av*(v2av*s2av + vsav*vsav)), &
+                      sqrt(s2av*(v2av*w2av + vwav*vwav)), vws(k,iCell))
       enddo
 
       do k=2,nVertLevels
         Ksps = sigma(k,iCell)*KspsU(k,iCell) + (1.0 - sigma(k,iCell))*KspsD(k,iCell)
         Kps = sqrt((u2(i1,k,iCell) + v2(i1,k,iCell) + w2(i1,k,iCell)))
         B = adcConst%grav*(alphaT(iCell)*wt(i1,k,iCell) - betaS(iCell)*ws(i1,k,iCell))
+
+        Uz = (uvel(k-1,iCell) - uvel(k,iCell)) / (zmid(k-1,iCell) - zmid(k,iCell))
+        Vz = (vvel(k-1,iCell) - vvel(k,iCell)) / (zmid(k-1,iCell) - zmid(k,iCell))
 
         taupt(k,iCell) = Kps / (sqrt(2.0)*adcConst%c_pt*len(k,iCell))
         taups(k,iCell) = Kps / (sqrt(2.0)*adcConst%c_ps*len(k,iCell))
@@ -917,50 +942,6 @@ module adc
       w2tend5(k,iCell) =(1.0/3.0*adcConst%alpha1 -               &
       adcConst%alpha2)*(uw(i1,k,iCell)*Uz + vw(i1,k,iCell)*Vz) 
 
-      ! 2.0*Swup*Mc(k,iCell)
-
-!        wttend(k,iCell) = -(E(k,iCell) + D(k,iCell))*wumd(k,iCell)*tumd(k,iCell) - ((1.0-2.0*sigma(k-1,iCell))*       &
-!          wumd(k-1,iCell)*Mc(k-1,iCell)*tumd(k-1,iCell) - (1.0-2.0*sigma(k+1,iCell))*wumd(k+1,iCell)*     &
-!          tumd(k+1,iCell)*Mc(k+1,iCell)) / (zmid(k-1,iCell) - zmid(k+1,iCell)) - Mcav*wumdav*(temp(k-1,iCell) - &
-!          temp(k,iCell)) / (zmid(k-1,iCell) - zmid(k,iCell)) + sig(k,iCell)*(1.0-sig(k,iCell))*tumd(k,iCell)*Swup -          &
-!          adcConst%C_therm*KE/(len(k,iCell) + 1.0e-15)*wt(i1,k,iCell)
-!        wstend(k,iCell) = -(E(k,iCell) + D(k,iCell))*wumd(k,iCell)*sumd(k,iCell) - ((1.0-2.0*sigma(k-1,iCell))*       &
-!          wumd(k-1,iCell)*Mc(k-1,iCell)*sumd(k-1,iCell) - (1.0-2.0*sigma(k+1,iCell))*wumd(k+1,iCell)*     &
-!          sumd(k+1,iCell)*Mc(k+1,iCell)) / (zmid(k-1,iCell) - zmid(k+1,iCell)) - Mcav*wumdav*(salt(k-1,iCell) - &
-!          salt(k,iCell)) / (zmid(k-1,iCell) - zmid(k,iCell)) + sigma(k,iCell)*(1.0-sigma(k,iCell))*       &
-!          sumd(k,iCell)*Swup - adcConst%C_therm*KE/(len(k,iCell) + 1.0E-15)*ws(i1,k,iCell)
-
-!        taupt = KE / (sqrt(2.0)*adcConst%c_pt*len(k,iCell))
-!        taups = KE / (sqrt(2.0)*adcConst%c_ps*len(k,iCell))
-
-!        wttend(k,iCell) = -(w2t(k-1,iCell) - w2t(k,iCell)) / (zmid(k-1,iCell) - zmid(k,iCell)) - &
-!          w2(i1,k,iCell)*(temp(k-1,iCell) - temp(k,iCell)) / (zmid(k-1,iCell) - zmid(k,iCell)) + &
-!          (1.0 - adcConst%gamma1)*adcConst%grav*(alphaT(iCell)*t2(i1,k,iCell) - betaS(iCell)*    &
-!          ts(i1,k,iCell)) - wt(i1,k,iCell) * taupt  - adcConst%alpha3/4.0*(ut(i1,k,iCell)*Uz +   &
-!          vt(i1,k,iCell)*Vz) + adcConst%kappa_FL*(wt(i1,k-1,iCell) - wt(i1,k+1,iCell)) / (zedge(k-1,iCell) - &
-!                zedge(k+1,iCell))**2.0
-
-!        wttend1(k,iCell) = -(w2t(k-1,iCell) - w2t(k,iCell)) / (zmid(k-1,iCell) - zmid(k,iCell))
-!        wttend2(k,iCell) = -w2(i1,k,iCell)*(temp(k-1,iCell) - temp(k,iCell)) / (zmid(k-1,iCell) - zmid(k,iCell))
-!        wttend3(k,iCell) = (1.0 - adcConst%gamma1)*adcConst%grav*(alphaT(iCell)*t2(i2,k,iCell) - &
-!            betaS(iCell)* ts(i2,k,iCell))
-!        wttend4(k,iCell) = - wt(i1,k,iCell) * taupt
-!        wttend5(k,iCell) = - adcConst%alpha3/4.0*(ut(i1,k,iCell)*Uz + vt(i1,k,iCell)*Vz)
-
-!        wstend(k,iCell) = -(w2s(k-1,iCell) - w2s(k,iCell)) / (zmid(k-1,iCell) - zmid(k,iCell)) - &
-!          w2(i1,k,iCell)*(salt(k-1,iCell) - salt(k,iCell)) / (zmid(k-1,iCell) - zmid(k,iCell)) + &
-!          (1.0 - adcConst%gamma1)*adcConst%grav*(alphaT(iCell)*ts(i2,k,iCell) - betaS(iCell)*    &
-!          s2(i2,k,iCell)) - ws(i1,k,iCell) * taups - adcConst%alpha3/4.0*(us(i1,k,iCell)*Uz +   &
-!          vs(i1,k,iCell)*Vz) + adcConst%kappa_FL*(ws(i1,k-1,iCell) - ws(i1,k+1,iCell)) / (zedge(k-1,iCell) - &
-!                zedge(k+1,iCell))**2.0
-
-!        wstend1(k,iCell) = -(w2s(k-1,iCell) - w2s(k,iCell)) / (zmid(k-1,iCell) - zmid(k,iCell))
-!        wstend2(k,iCell) = -w2(i1,k,iCell)*(salt(k-1,iCell) - salt(k,iCell)) / (zmid(k-1,iCell) - zmid(k,iCell))
-!        wstend3(k,iCell) = (1.0 - adcConst%gamma1)*adcConst%grav*(alphaT(iCell)*ts(i2,k,iCell) - &
-!                    betaS(iCell)*s2(i2,k,iCell))
-!        wstend4(k,iCell) = - ws(i1,k,iCell) * taups
-!        wstend5(k,iCell) = -adcConst%alpha3/4.0*(us(i1,k,iCell)*Uz + vs(i1,k,iCell)*Vz)  
-      !   wstend(k,iCell) = 0.0
       enddo
     enddo
 
@@ -991,8 +972,6 @@ module adc
           stop
         endif
 
-!        wt(i2,k,iCell) = wt(i1,k,iCell) + dt*wttend(k,iCell)
-!        ws(i2,k,iCell) = ws(i1,k,iCell) + dt*wstend(k,iCell)
       enddo
     enddo
 
@@ -1024,437 +1003,6 @@ module adc
     enddo
 
   end subroutine update_mean_fields
-
-  subroutine write_turbulent_fields(nCells,nVertLevels,BVF,temp,salt,uvel,vvel)
-
-    integer,intent(in) :: nCells,nVertLevels
-    real,dimension(nVertLevels+1,nCells),intent(in),optional :: BVF
-    real,dimension(nVertLevels,nCells),intent(in),optional :: temp,salt,uvel,vvel
-
-    integer,parameter :: NDIMS=3
-    integer,dimension(NDIMS) :: start,extent
-    integer :: ncid,u2_varid,v2_varid,w2_varid,t2_varid,s2_varid, &
-      uw_varid,vw_varid,wt_varid,ws_varid,ut_varid,vt_varid,      &
-      us_varid,vs_varid,ts_varid,uv_varid,uvw_varid,uw2_varid,    &
-      u2w_varid,v2w_varid,vw2_varid,w3_varid,w2t_varid,w2s_varid, &
-      sigma_varid,len_varid,ze_varid,zm_varid,kspsu_varid,        &
-      kspsd_varid,lspsU_varid, E_varid, D_varid, tumd_varid,       &
-      sumd_varid, wumd_varid, MC_varid, bvf_varid, u_varid, v_varid, &
-      t_varid, s_varid, l1_varid, l2_varid, l3_varid, lspsD_varid, &
-      w2t1_varid,w2t2_varid,w2t3_varid,w2t4_varid, wtt1_varid, &
-      wtt2_varid,wtt3_varid,wtt4_varid,w3t1_varid,w3t2_varid, &
-      w3t3_varid,w3t4_varid,w3t5_varid, w2t5_varid, u2t1_varid, &
-      u2t2_varid,u2t3_varid,u2t4_varid,u2t5_varid,u2t6_varid, &
-      uwt1_varid,uwt2_varid,uwt3_varid,uwt4_varid,uwt5_varid, &
-      wtt5_varid,u2c_varid,v2c_varid,w2c_varid,v2t1_varid, &
-      v2t2_varid,v2t3_varid,v2t4_varid,v2t5_varid,wst1_varid, &
-      wst2_varid,wst3_varid,wst4_varid,wst5_varid,lendn_varid, &
-      lenup_varid
-
-    integer :: dimids_center(nDIMS),dimids_edges(nDims)
-    integer :: ncell_id,nvl_id,ncstat,nvlp1_id,rec_dimid
-
-    integer i,j
-
-    if(defineFirst) then
-
-    ncstat = nf90_create('turb_profiles.nc',NF90_CLOBBER,ncid)
-
-    ncstat = nf90_def_dim(ncid,'nCells',nCells,ncell_id)
-    ncstat = nf90_def_dim(ncid,'nVertLevels',nVertLevels,nvl_id)
-    ncstat = nf90_def_dim(ncid,'nVertLevelsP1',nvertLevels+1,nvlp1_id)
-    ncstat = nf90_def_dim(ncid,'Time',NF90_UNLIMITED,rec_dimid)
-
-    dimids_center = (/nvl_id,ncell_id,rec_dimid/)
-    dimids_edges = (/nvlp1_id,ncell_id,rec_dimid/)
-
-    ncstat = nf90_def_var(ncid,'u2',NF90_DOUBLE,dimids_edges,u2_varid)
-    ncstat = nf90_def_var(ncid,'v2',NF90_FLOAT,dimids_edges,v2_varid)
-    ncstat = nf90_def_var(ncid,'w2',NF90_FLOAT,dimids_edges,w2_varid)
-    ncstat = nf90_def_var(ncid,'w2tend1',NF90_FLOAT,dimids_edges,w2t1_varid)
-    ncstat = nf90_def_var(ncid,'w2tend2',NF90_FLOAT,dimids_edges,w2t2_varid)
-    ncstat = nf90_def_var(ncid,'w2tend3',NF90_FLOAT,dimids_edges,w2t3_varid)
-    ncstat = nf90_def_var(ncid,'w2tend4',NF90_FLOAT,dimids_edges,w2t4_varid)
-    ncstat = nf90_def_var(ncid,'w2tend5',NF90_FLOAT,dimids_edges,w2t5_varid)
-    ncstat = nf90_def_var(ncid,'u2tend1',NF90_FLOAT,dimids_edges,u2t1_varid)
-    ncstat = nf90_def_var(ncid,'u2tend2',NF90_FLOAT,dimids_edges,u2t2_varid)
-    ncstat = nf90_def_var(ncid,'u2tend3',NF90_FLOAT,dimids_edges,u2t3_varid)
-    ncstat = nf90_def_var(ncid,'u2tend4',NF90_FLOAT,dimids_edges,u2t4_varid)
-    ncstat = nf90_def_var(ncid,'u2tend5',NF90_FLOAT,dimids_edges,u2t5_varid)
-    ncstat = nf90_def_var(ncid,'u2tend6',NF90_FLOAT,dimids_edges,u2t6_varid)
-    ncstat = nf90_def_var(ncid,'u2cliptend',NF90_FLOAT,dimids_edges,u2c_varid)
-    ncstat = nf90_def_var(ncid,'v2cliptend',NF90_FLOAT,dimids_edges,v2c_varid)
-    ncstat = nf90_def_var(ncid,'w2cliptend',NF90_FLOAT,dimids_edges,w2c_varid)
-    ncstat = nf90_def_var(ncid,'v2tend1',NF90_FLOAT,dimids_edges,v2t1_varid)
-    ncstat = nf90_def_var(ncid,'v2tend2',NF90_FLOAT,dimids_edges,v2t2_varid)
-    ncstat = nf90_def_var(ncid,'v2tend3',NF90_FLOAT,dimids_edges,v2t3_varid)
-    ncstat = nf90_def_var(ncid,'v2tend4',NF90_FLOAT,dimids_edges,v2t4_varid)
-    ncstat = nf90_def_var(ncid,'v2tend5',NF90_FLOAT,dimids_edges,v2t5_varid)
-
-    ncstat = nf90_def_var(ncid,'uwtend1',NF90_FLOAT,dimids_edges,uwt1_varid)
-    ncstat = nf90_def_var(ncid,'uwtend2',NF90_FLOAT,dimids_edges,uwt2_varid)
-    ncstat = nf90_def_var(ncid,'uwtend3',NF90_FLOAT,dimids_edges,uwt3_varid)
-    ncstat = nf90_def_var(ncid,'uwtend4',NF90_FLOAT,dimids_edges,uwt4_varid)
-    ncstat = nf90_def_var(ncid,'uwtend5',NF90_FLOAT,dimids_edges,uwt5_varid)
-    ncstat = nf90_def_var(ncid,'t2',NF90_FLOAT,dimids_edges,t2_varid)
-    ncstat = nf90_def_var(ncid,'s2',NF90_FLOAT,dimids_edges,s2_varid)
-    ncstat = nf90_def_var(ncid,'uw',NF90_FLOAT,dimids_edges,uw_varid)
-    ncstat = nf90_def_var(ncid,'vw',NF90_FLOAT,dimids_edges,vw_varid)
-    ncstat = nf90_def_var(ncid,'wt',NF90_FLOAT,dimids_edges,wt_varid)
-    ncstat = nf90_def_var(ncid,'wttend1',NF90_FLOAT,dimids_edges,wtt1_varid)
-    ncstat = nf90_def_var(ncid,'wttend2',NF90_FLOAT,dimids_edges,wtt2_varid)
-    ncstat = nf90_def_var(ncid,'wttend3',NF90_FLOAT,dimids_edges,wtt3_varid)
-    ncstat = nf90_def_var(ncid,'wttend4',NF90_FLOAT,dimids_edges,wtt4_varid)
-    ncstat = nf90_def_var(ncid,'wttend5',NF90_FLOAT,dimids_edges,wtt5_varid)
-    ncstat = nf90_def_var(ncid,'wstend1',NF90_FLOAT,dimids_edges,wst1_varid)
-    ncstat = nf90_def_var(ncid,'wstend2',NF90_FLOAT,dimids_edges,wst2_varid)
-    ncstat = nf90_def_var(ncid,'wstend3',NF90_FLOAT,dimids_edges,wst3_varid)
-    ncstat = nf90_def_var(ncid,'wstend4',NF90_FLOAT,dimids_edges,wst4_varid)
-    ncstat = nf90_def_var(ncid,'wstend5',NF90_FLOAT,dimids_edges,wst5_varid)
-    ncstat = nf90_def_var(ncid,'ws',NF90_FLOAT,dimids_edges,ws_varid)
-    ncstat = nf90_def_var(ncid,'ut',NF90_FLOAT,dimids_edges,ut_varid)
-    ncstat = nf90_def_var(ncid,'vt',NF90_FLOAT,dimids_edges,vt_varid)
-    ncstat = nf90_def_var(ncid,'ts',NF90_FLOAT,dimids_edges,ts_varid)
-    ncstat = nf90_def_var(ncid,'uv',NF90_FLOAT,dimids_edges,uv_varid)
-    ncstat = nf90_def_var(ncid,'us',NF90_FLOAT,dimids_edges,us_varid)
-    ncstat = nf90_def_var(ncid,'vs',NF90_FLOAT,dimids_edges,vs_varid)
-    ncstat = nf90_def_var(ncid,'E',NF90_FLOAT,dimids_edges,E_varid)
-    ncstat = nf90_def_var(ncid,'D',NF90_FLOAT,dimids_edges,D_varid)
-    ncstat = nf90_def_var(ncid,'Mc',NF90_FLOAT,dimids_edges,MC_varid)
-    ncstat = nf90_def_var(ncid,'tumd',NF90_FLOAT,dimids_edges,tumd_varid)
-    ncstat = nf90_def_var(ncid,'sumd',NF90_FLOAT,dimids_edges,sumd_varid)
-    ncstat = nf90_def_var(ncid,'wumd',NF90_FLOAT,dimids_edges,wumd_varid)
-    ncstat = nf90_def_var(ncid,'len',NF90_FLOAT,dimids_edges,len_varid)
-    ncstat = nf90_def_var(ncid,'zedge',NF90_FLOAT,dimids_edges,ze_varid)
-    ncstat = nf90_def_var(ncid,'KspsU',NF90_FLOAT,dimids_edges,kspsu_varid)
-    ncstat = nf90_def_var(ncid,'KspsD',NF90_FLOAT,dimids_edges,kspsd_varid)
-    ncstat = nf90_def_var(ncid,'lenspsD',NF90_FLOAT,dimids_edges,lspsD_varid)
-    ncstat = nf90_def_var(ncid,'lenspsU',NF90_FLOAT,dimids_edges,lspsU_varid)
-    ncstat = nf90_def_var(ncid,'len1',NF90_FLOAT,dimids_edges,l1_varid)
-    ncstat = nf90_def_var(ncid,'len2',NF90_FLOAT,dimids_edges,l2_varid)
-    ncstat = nf90_def_var(ncid,'len3',NF90_FLOAT,dimids_edges,l3_varid)
-    ncstat = nf90_def_var(ncid,'lendn',NF90_FLOAT,dimids_edges,lendn_varid)
-    ncstat = nf90_def_var(ncid,'lenup',NF90_FLOAT,dimids_edges,lenup_varid)
-
-    ncstat = nf90_def_var(ncid,'uvw',NF90_FLOAT,dimids_center,uvw_varid)
-    ncstat = nf90_def_var(ncid,'uw2',NF90_FLOAT,dimids_center,uw2_varid)
-    ncstat = nf90_def_var(ncid,'u2w',NF90_FLOAT,dimids_center,u2w_varid)
-    ncstat = nf90_def_var(ncid,'v2w',NF90_FLOAT,dimids_center,uvw_varid)
-    ncstat = nf90_def_var(ncid,'vw2',NF90_FLOAT,dimids_center,vw2_varid)
-    ncstat = nf90_def_var(ncid,'w3',NF90_FLOAT,dimids_center,w3_varid)
-    ncstat = nf90_def_var(ncid,'w3tend1',NF90_FLOAT,dimids_center,w3t1_varid)
-    ncstat = nf90_def_var(ncid,'w3tend2',NF90_FLOAT,dimids_center,w3t2_varid)
-    ncstat = nf90_def_var(ncid,'w3tend3',NF90_FLOAT,dimids_center,w3t3_varid)
-    ncstat = nf90_def_var(ncid,'w3tend4',NF90_FLOAT,dimids_center,w3t4_varid)
-    ncstat = nf90_def_var(ncid,'w3tend5',NF90_FLOAT,dimids_center,w3t5_varid)
-    ncstat = nf90_def_var(ncid,'w2t',NF90_FLOAT,dimids_center,w2t_varid)
-    ncstat = nf90_def_var(ncid,'w2s',NF90_FLOAT,dimids_center,w2s_varid)
-    ncstat = nf90_def_var(ncid,'sigma',NF90_FLOAT,dimids_edges,sigma_varid)
-    ncstat = nf90_def_var(ncid,'zmid',NF90_FLOAT,dimids_center,zm_varid)
-    ncstat = nf90_def_var(ncid,'TEMP',NF90_FLOAT,dimids_center,t_varid)
-    ncstat = nf90_def_var(ncid,'SALT',NF90_FLOAT,dimids_center,s_varid)
-    ncstat = nf90_def_var(ncid,'UVEL',NF90_FLOAT,dimids_center,u_varid)
-    ncstat = nf90_def_var(ncid,'VVEL',NF90_FLOAT,dimids_center,v_varid)
-    ncstat = nf90_def_var(ncid,'BVF',NF90_FLOAT,dimids_edges,bvf_varid)
-    ncstat = nf90_enddef(ncid)
-
-    ncstat = nf90_close(ncid)
-    record = 1
-    defineFirst = .false.
-    else
-
-    start(1) = 1
-    start(2) = 1
-    start(3) = record
-    extent(3) = 1
-    extent(1) = nVertLevels+1
-    extent(2) = nCells
-
-    ncstat = nf90_open('turb_profiles.nc',nf90_write,ncid)
-    ncstat = nf90_inq_varid(ncid,'u2',u2_varid)
-
-    ncstat = nf90_put_var(ncid,u2_varid,u2(i2,:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'v2',v2_varid)
-    ncstat = nf90_put_var(ncid,v2_varid,v2(i2,:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'w2',w2_varid)
-    ncstat = nf90_put_var(ncid,w2_varid,w2(i2,:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'w2tend1',w2t1_varid)
-    ncstat = nf90_put_var(ncid,w2t1_varid,w2tend1(:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'w2tend2',w2t2_varid)
-    ncstat = nf90_put_var(ncid,w2t2_varid,w2tend2(:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'w2tend3',w2t3_varid)
-    ncstat = nf90_put_var(ncid,w2t3_varid,w2tend3(:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'w2tend4',w2t4_varid)
-    ncstat = nf90_put_var(ncid,w2t4_varid,w2tend4(:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'w2tend5',w2t5_varid)
-    ncstat = nf90_put_var(ncid,w2t5_varid,w2tend5(:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'u2tend1',u2t1_varid)
-    ncstat = nf90_put_var(ncid,u2t1_varid,u2tend1(:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'u2tend2',u2t2_varid)
-    ncstat = nf90_put_var(ncid,u2t2_varid,u2tend2(:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'u2tend3',u2t3_varid)
-    ncstat = nf90_put_var(ncid,u2t3_varid,u2tend3(:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'u2tend4',u2t4_varid)
-    ncstat = nf90_put_var(ncid,u2t4_varid,u2tend4(:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'u2tend5',u2t5_varid)
-    ncstat = nf90_put_var(ncid,u2t5_varid,u2tend5(:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'v2tend1',v2t1_varid)
-    ncstat = nf90_put_var(ncid,v2t1_varid,v2tend1(:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'v2tend2',v2t2_varid)
-    ncstat = nf90_put_var(ncid,v2t2_varid,v2tend2(:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'v2tend3',v2t3_varid)
-    ncstat = nf90_put_var(ncid,v2t3_varid,v2tend3(:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'v2tend4',v2t4_varid)
-    ncstat = nf90_put_var(ncid,v2t4_varid,v2tend4(:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'v2tend5',v2t5_varid)
-    ncstat = nf90_put_var(ncid,v2t5_varid,v2tend5(:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'u2tend6',u2t6_varid)
-    ncstat = nf90_put_var(ncid,u2t6_varid,u2tend6(:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'u2cliptend',u2c_varid)
-    ncstat = nf90_put_var(ncid,u2c_varid,u2cliptend(:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'v2cliptend',v2c_varid)
-    ncstat = nf90_put_var(ncid,v2c_varid,v2cliptend(:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'w2cliptend',w2c_varid)
-    ncstat = nf90_put_var(ncid,w2c_varid,w2cliptend(:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'uwtend1',uwt1_varid)
-    ncstat = nf90_put_var(ncid,uwt1_varid,uwtend1(:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'uwtend2',uwt2_varid)
-    ncstat = nf90_put_var(ncid,uwt2_varid,uwtend2(:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'uwtend3',uwt3_varid)
-    ncstat = nf90_put_var(ncid,uwt3_varid,uwtend3(:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'uwtend4',uwt4_varid)
-    ncstat = nf90_put_var(ncid,uwt4_varid,uwtend4(:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'uwtend5',uwt5_varid)
-    ncstat = nf90_put_var(ncid,uwt5_varid,uwtend5(:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'t2',t2_varid)
-    ncstat = nf90_put_var(ncid,t2_varid,t2(i2,:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'s2',s2_varid)
-    ncstat = nf90_put_var(ncid,s2_varid,s2(i2,:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'uw',uw_varid)
-    ncstat = nf90_put_var(ncid,uw_varid,uw(i2,:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'vw',vw_varid)
-    ncstat = nf90_put_var(ncid,vw_varid,vw(i2,:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'wt',wt_varid)
-    ncstat = nf90_put_var(ncid,wt_varid,wt(i2,:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'wttend1',wtt1_varid)
-    ncstat = nf90_put_var(ncid,wtt1_varid,wttend1(:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'wttend2',wtt2_varid)
-    ncstat = nf90_put_var(ncid,wtt2_varid,wttend2(:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'wttend3',wtt3_varid)
-    ncstat = nf90_put_var(ncid,wtt3_varid,wttend3(:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'wttend4',wtt4_varid)
-    ncstat = nf90_put_var(ncid,wtt4_varid,wttend4(:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'wttend5',wtt5_varid)
-    ncstat = nf90_put_var(ncid,wtt5_varid,wttend5(:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'wstend1',wst1_varid)
-    ncstat = nf90_put_var(ncid,wst1_varid,wstend1(:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'wstend2',wst2_varid)
-    ncstat = nf90_put_var(ncid,wst2_varid,wstend2(:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'wstend3',wst3_varid)
-    ncstat = nf90_put_var(ncid,wst3_varid,wstend3(:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'wstend4',wst4_varid)
-    ncstat = nf90_put_var(ncid,wst4_varid,wstend4(:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'wstend5',wst5_varid)
-    ncstat = nf90_put_var(ncid,wst5_varid,wstend5(:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'ws',ws_varid)
-    ncstat = nf90_put_var(ncid,ws_varid,ws(i2,:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'ut',ut_varid)
-    ncstat = nf90_put_var(ncid,ut_varid,ut(i2,:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'vt',vt_varid)
-    ncstat = nf90_put_var(ncid,vt_varid,vt(i2,:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'ts',ts_varid)
-    ncstat = nf90_put_var(ncid,ts_varid,ts(i2,:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'uv',uv_varid)
-    ncstat = nf90_put_var(ncid,uv_varid,uv(i2,:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'us',us_varid)
-    ncstat = nf90_put_var(ncid,us_varid,us(i2,:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'vs',vs_varid)
-    ncstat = nf90_put_var(ncid,vs_varid,vs(i2,:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'lendn',lendn_varid)
-    ncstat = nf90_put_var(ncid,lendn_varid,lendn,start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'lenup',lenup_varid)
-    ncstat = nf90_put_var(ncid,lenup_varid,lenup,start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'len',len_varid)
-    ncstat = nf90_put_var(ncid,len_varid,len,start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'len1',l1_varid)
-    ncstat = nf90_put_var(ncid,l1_varid,lenbuoy,start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'len2',l2_varid)
-    ncstat = nf90_put_var(ncid,l2_varid,lenblac,start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'len3',l3_varid)
-    ncstat = nf90_put_var(ncid,l3_varid,lenshea,start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'zedge',ze_varid)
-    ncstat = nf90_put_var(ncid,ze_varid,zedge,start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'KspsU',kspsu_varid)
-    ncstat = nf90_put_var(ncid,kspsu_varid,KspsU(:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'KspsD',kspsd_varid)
-    ncstat = nf90_put_var(ncid,kspsd_varid,KspsD(:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'lenspsD',lspsD_varid)
-    ncstat = nf90_put_var(ncid,lspsD_varid,lenspsD(:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'lenspsU',lspsU_varid)
-    ncstat = nf90_put_var(ncid,lspsU_varid,lenspsU(:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'E',E_varid)
-    ncstat = nf90_put_var(ncid,E_varid,E(:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'D',D_varid)
-    ncstat = nf90_put_var(ncid,D_varid,D(:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'Mc',MC_varid)
-    ncstat = nf90_put_var(ncid,MC_varid,Mc(:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'tumd',tumd_varid)
-    ncstat = nf90_put_var(ncid,tumd_varid,tumd(:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'sumd',sumd_varid)
-    ncstat = nf90_put_var(ncid,sumd_varid,sumd(:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'wumd',wumd_varid)
-    ncstat = nf90_put_var(ncid,wumd_varid,wumd(:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'sigma',sigma_varid)
-    ncstat = nf90_put_var(ncid,sigma_varid,sigma,start,extent)
-
-    if(present(BVF)) then
-        ncstat = nf90_inq_varid(ncid,'BVF',bvf_varid)
-        ncstat = nf90_put_var(ncid,bvf_varid,BVF,start,extent)
-    endif
-
-    extent(1) = nVertLevels
-
-    if(present(temp)) then
-      ncstat = nf90_inq_varid(ncid,'TEMP',t_varid)
-      ncstat = nf90_put_var(ncid,t_varid,temp,start,extent)
-    endif
-
-    if(present(salt)) then
-      ncstat = nf90_inq_varid(ncid,'SALT',s_varid)
-      ncstat = nf90_put_var(ncid,s_varid,salt,start,extent)
-    endif
-
-    if(present(uvel)) then
-      ncstat = nf90_inq_varid(ncid,'UVEL',u_varid)
-      ncstat = nf90_put_var(ncid,u_varid,uvel,start,extent)
-    endif
-
-    if(present(vvel)) then
-      ncstat = nf90_inq_varid(ncid,'VVEL',v_varid)
-      ncstat = nf90_put_var(ncid,v_varid,vvel,start,extent)
-    endif
-
-    ncstat = nf90_inq_varid(ncid,'zmid',zm_varid)
-    ncstat = nf90_put_var(ncid,zm_varid,zmid,start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'uvw',uvw_varid)
-    ncstat = nf90_put_var(ncid,uvw_varid,uvw,start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'uw2',uw2_varid)
-    ncstat = nf90_put_var(ncid,uw2_varid,uw2,start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'u2w',u2w_varid)
-    ncstat = nf90_put_var(ncid,u2w_varid,u2w,start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'v2w',v2w_varid)
-    ncstat = nf90_put_var(ncid,v2w_varid,v2w,start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'vw2',vw2_varid)
-    ncstat = nf90_put_var(ncid,vw2_varid,vw2,start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'w3',w3_varid)
-    ncstat = nf90_put_var(ncid,w3_varid,w3(i2,:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'w3tend1',w3t1_varid)
-    ncstat = nf90_put_var(ncid,w3t1_varid,w3tend1(:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'w3tend2',w3t2_varid)
-    ncstat = nf90_put_var(ncid,w3t2_varid,w3tend2(:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'w3tend3',w3t3_varid)
-    ncstat = nf90_put_var(ncid,w3t3_varid,w3tend3(:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'w3tend4',w3t4_varid)
-    ncstat = nf90_put_var(ncid,w3t4_varid,w3tend4(:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'w3tend5',w3t5_varid)
-    ncstat = nf90_put_var(ncid,w3t5_varid,w3tend5(:,:),start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'w2t',w2t_varid)
-    ncstat = nf90_put_var(ncid,w2t_varid,w2t,start,extent)
-
-    ncstat = nf90_inq_varid(ncid,'w2s',w2s_varid)
-    ncstat = nf90_put_var(ncid,w2s_varid,w2s,start,extent)
-
-    ncstat = nf90_close(ncid)
-    record=record+1
-  endif
-
-  if(stopflag) stop
-  end subroutine write_turbulent_fields
-
-  subroutine ADC_init(ntimes,nCells,nVertLevels)
-    integer,intent(in) :: ntimes,nCells,nVertLevels
-    fileTime=0.0
-    call init_adc(ntimes,nCells,nVertLevels)
-    call write_turbulent_fields(nCells,nVertLevels)
-  end subroutine ADC_init
 
   subroutine ADC_main_loop(nCells,nVertLevels,niter,dt,temp,salt,uvel,vvel,BVF,layerThick,ssh,  &
       uwsfc,vwsfc,wtsfc,wssfc,alphaT,betaS,fCor,fileFrequency,adcConst)

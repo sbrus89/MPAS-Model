@@ -45,6 +45,7 @@ module ocn_forward_mode
    use ocn_thick_ale
    use ocn_thick_surface_flux
 
+   use ocn_vmix_adc
    use ocn_vel_pressure_grad
    use ocn_vel_vadv
    use ocn_vel_hmix
@@ -731,6 +732,8 @@ module ocn_forward_mode
       call mpas_dmpar_exch_group_destroy_reusable_buffers(domain, 'subcycleFields')
 
       call ocn_analysis_finalize(domain, ierr)
+
+      if(config_adc_enable) call ocn_vmix_adc_finalize(ierr)
 
       call mpas_destroy_clock(domain % clock, ierr)
 

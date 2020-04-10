@@ -26,6 +26,7 @@ module ocn_vmix
    use mpas_pool_routines
    use mpas_timer
 
+   use ocn_vmix_adc
    use ocn_constants
    use ocn_vmix_coefs_const
    use ocn_vmix_coefs_tanh
@@ -890,7 +891,8 @@ contains
       err = ior(err, err_tmp)
       call ocn_vmix_coefs_redi_init(err_tmp)
       err = ior(err, err_tmp)
-
+      call ocn_vmix_adc_init(domain, err_tmp)
+      err = ior(err, err_tmp)
    !--------------------------------------------------------------------
 
    end subroutine ocn_vmix_init!}}}

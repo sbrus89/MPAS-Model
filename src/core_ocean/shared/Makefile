@@ -6,6 +6,8 @@
 
 OBJS = mpas_ocn_init_routines.o \
 	   mpas_ocn_gm.o \
+		 mpas_ocn_turbulence.o \
+		 mpas_ocn_vmix_adc.o \
 	   mpas_ocn_diagnostics.o \
 	   mpas_ocn_diagnostics_routines.o \
 	   mpas_ocn_thick_ale.o \
@@ -137,6 +139,10 @@ mpas_ocn_tracer_short_wave_absorption.o: mpas_ocn_tracer_short_wave_absorption_j
 mpas_ocn_tracer_short_wave_absorption_variable.o: mpas_ocn_constants.o mpas_ocn_config.o mpas_ocn_framework_forcing.o
 
 mpas_ocn_tracer_short_wave_absorption_jerlov.o: mpas_ocn_constants.o mpas_ocn_config.o
+
+mpas_ocn_turbulence.o: mpas_ocn_config.o 
+
+mpas_ocn_vmix_adc.o: mpas_ocn_constants.o mpas_ocn_turbulence.o 
 
 mpas_ocn_vmix.o: mpas_ocn_vmix_coefs_const.o mpas_ocn_vmix_coefs_rich.o mpas_ocn_vmix_coefs_tanh.o mpas_ocn_vmix_cvmix.o mpas_ocn_vmix_coefs_redi.o mpas_ocn_constants.o mpas_ocn_config.o
 

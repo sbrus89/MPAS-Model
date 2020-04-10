@@ -47,6 +47,8 @@ list(APPEND RAW_SOURCES
 
   core_ocean/shared/mpas_ocn_init_routines.F
   core_ocean/shared/mpas_ocn_gm.F
+  core_ocean/shared/mpas_ocn_turbulence.F
+  core_ocean/shared/mpas_ocn_vmix_adc.F
   core_ocean/shared/mpas_ocn_diagnostics.F
   core_ocean/shared/mpas_ocn_diagnostics_routines.F
   core_ocean/shared/mpas_ocn_thick_ale.F
