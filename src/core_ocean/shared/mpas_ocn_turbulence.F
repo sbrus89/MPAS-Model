@@ -48,14 +48,14 @@ module ocn_turbulence
                        c_therm, c_mom_w3, c_pt, c_ps, c_pv, &
                        kappa_FL, kappa_w3, kappa_VAR, Cww_D, Cww_E
 
-   real(kind=RKIND), dimension(:,:), pointer :: KspsU, KspsD, ze, zm, &
-                       eps, length, lenspsD, lenspsU, KhU, KhD, KmU,  &
+   real(kind=RKIND), dimension(:,:), allocatable :: KspsU, KspsD, ze, zm, &
+                       eps, lendn, lenup, length, lenspsD, lenspsU, KhU, KhD, KmU,  &
                        KmD, wt_spsU, wt_spsD, ws_spsU, ws_spsD, uw2,  &
                        vw2, u2w, v2w, w2t, w2s, wts, uvw, uwt, vwt,   &
                        uws, vws, ws2, wt2, areaFraction, Entrainment,        &
                        Detrainment, tumd, sumd, wumd, Mc
 
-   real(kind=RKIND), dimension(:,:), pointer :: w2tend1, w2tend2,     &
+   real(kind=RKIND), dimension(:,:), allocatable :: w2tend1, w2tend2,     &
                        w2tend3, w2tend4, w2tend5, wttend1, wttend2,   &
                        wttend3, wttend4, wttend5, w3tend1, w3tend2,   &
                        w3tend3, w3tend5, w3tend4, wstend1, wstend2,   &
@@ -66,7 +66,7 @@ module ocn_turbulence
                        v2tend3, v2tend4, v2tend5, u2cliptend,         &
                        v2cliptend, w2cliptend
 
-   real(kind=RKIND), dimension(:,:,:), pointer :: u2, v2, w2, t2, s2, &
+   real(kind=RKIND), dimension(:,:,:), allocatable :: u2, v2, w2, t2, s2, &
                        uw, vw, wt, ws, w3, uv, ut, vt, us, vs, ts
 
    end type adcMixingType
@@ -98,14 +98,14 @@ module ocn_turbulence
          block                    ! variables in current subblock
 
    type (mpas_pool_type), pointer :: &
-         adcDiagnosticsPool, adcPrognosticsPool, adcTendPool  ! mesh variables in MPAS pool structure
+         adcDiagnosticsPool, adcPrognosticsPool, adcTendPool, meshPool  ! mesh variables in MPAS pool structure
 
    real(kind=RKIND), dimension(:,:), pointer :: KspsUTmp, KspsDTmp, zeTmp, zmTmp, &
                        epsTmp, lengthTmp, lenspsDTmp, lenspsUTmp, KhUTmp, KhDTmp, KmUTmp,  &
                        KmDTmp, wt_spsUTmp, wt_spsDTmp, ws_spsUTmp, ws_spsDTmp, uw2Tmp,  &
                        vw2Tmp, u2wTmp, v2wTmp, w2tTmp, w2sTmp, wtsTmp, uvwTmp, uwtTmp, vwtTMP,   &
                        uwsTmp, vwsTmp, ws2Tmp, wt2Tmp, areaFractionTmp, EntrainmentTmp,        &
-                       DetrainmentTmp, tumdTmp, sumdTmp, wumdTmp, McTmp
+                       DetrainmentTmp, tumdTmp, sumdTmp, wumdTmp, McTmp, lendnTmp, lenupTmp
 
    real(kind=RKIND), dimension(:,:), pointer :: w2tend1Tmp, w2tend2Tmp,     &
                        w2tend3Tmp, w2tend4Tmp, w2tend5Tmp, wttend1Tmp, wttend2Tmp,   &
@@ -118,12 +118,22 @@ module ocn_turbulence
                        v2tend3Tmp, v2tend4Tmp, v2tend5Tmp, u2cliptendTmp,         &
                        v2cliptendTmp, w2cliptendTmp
 
-   real(kind=RKIND), dimension(:,:,:), pointer :: u2Tmp, v2Tmp, w2Tmp, t2Tmp, s2Tmp, &
+   real(kind=RKIND), dimension(:,:), pointer :: u2Tmp, v2Tmp, w2Tmp, t2Tmp, s2Tmp, &
                        uwTmp, vwTmp, wtTmp, wsTmp, w3Tmp, uvTmp, utTmp, vtTmp, usTmp,&
                        vsTmp, tsTmp
 
+   integer, pointer :: nVertLevels, nVertLevelsP1
+   integer :: nCells
+   integer, dimension(:), pointer :: nCellsArray
+
    block => domain % blocklist
    do while (associated(block))
+      call mpas_pool_get_subpool(block % structs, 'mesh', meshPool)
+      call mpas_pool_get_dimension(meshPool, 'nVertLevels', nVertLevels)
+      call mpas_pool_get_dimension(meshPool, 'nVertLevelsP1', nVertLevelsP1)
+      call mpas_pool_get_dimension(meshPool, 'nCellsArray', nCellsArray)
+
+      nCells = nCellsArray( size(nCellsArray) )
       call mpas_pool_get_subpool(block % structs, 'adcDiagnosticArrays', adcDiagnosticsPool)
       call mpas_pool_get_subpool(block % structs, 'adcTendArrays', adcTendPool)
       call mpas_pool_get_subpool(block % structs, 'adcPrognosticArrays', adcPrognosticsPool)
@@ -162,6 +172,8 @@ module ocn_turbulence
       call mpas_pool_get_array(adcDiagnosticsPool, 'zm', zmTmp)
       call mpas_pool_get_array(adcDiagnosticsPool, 'eps', epsTmp)
       call mpas_pool_get_array(adcDiagnosticsPool, 'length', lengthTmp)
+      call mpas_pool_get_array(adcDiagnosticsPool, 'lenup', lenupTmp)
+      call mpas_pool_get_array(adcDiagnosticsPool, 'lendn', lendnTmp)
       call mpas_pool_get_array(adcDiagnosticsPool, 'lenspsD', lenspsDTmp)
       call mpas_pool_get_array(adcDiagnosticsPool, 'lenspsU', lenspsUTmp)
       call mpas_pool_get_array(adcDiagnosticsPool, 'KhU', KhUTmp)
@@ -193,12 +205,35 @@ module ocn_turbulence
       call mpas_pool_get_array(adcDiagnosticsPool, 'sumd', sumdTmp)
       call mpas_pool_get_array(adcDiagnosticsPool, 'wumd', wumdTmp)
 
-      adcMixing%KspsD = KspsDTmp
+      allocate( adcMixing%KspsD( nVertLevelsP1, nCells ), adcMixing%KspsU( nVertLevelsP1, nCells) )
+      allocate( adcMixing%ze( nVertLevelsP1, nCells ), adcMixing%zm( nVertLevels, nCells ))
+      allocate( adcMixing%eps( nVertLevelsP1, nCells ), adcMixing%length( nVertLevelsP1, nCells ))
+      allocate( adcMixing%lendn( nVertLevelsP1, nCells ), adcMixing%lenup( nVertLevelsP1, nCells ))
+      allocate( adcMixing%lenspsU( nVertLevelsP1, nCells), adcMixing%lenspsD( nVertLevelsP1, nCells))
+      allocate( adcMixing%KhU( nVertLevelsP1, nCells), adcMixing%KhD( nVertLevelsP1, nCells))
+      allocate( adcMixing%KmU( nVertLevelsP1, nCells), adcMixing%KmD( nVertLevelsP1, nCells))
+      allocate( adcMixing%wt_spsU( nVertLevelsP1, nCells), adcMixing%wt_spsD( nVertLevelsP1, nCells))
+      allocate( adcMixing%ws_spsU( nVertLevelsP1, nCells), adcMixing%ws_spsD( nVertLevelsP1, nCells))
+      allocate( adcMixing%uw2( nVertLevels, nCells ), adcMixing%vw2( nVertLevels, nCells))
+      allocate( adcMixing%u2w( nVertLevels, nCells ), adcMixing%v2w( nVertLevels, nCells ))
+      allocate( adcMixing%w2t( nVertLevels, nCells ), adcMixing%w2s( nVertLevels, nCells ))
+      allocate( adcMixing%wts( nVertLevels, nCells ), adcMixing%uvw( nVertLevels, nCells ))
+      allocate( adcMixing%uwt( nVertLevels, nCells ), adcMixing%vwt( nVertLevels, nCells ))
+      allocate( adcMixing%uws( nVertLevels, nCells ), adcMixing%vws( nVertLevels, nCells ))
+      allocate( adcMixing%ws2( nVertLevels, nCells ), adcMixing%wt2( nVertLevels, nCells ))
+      allocate( adcMixing%areaFraction( nVertLevelsP1, nCells ))
+      allocate( adcMixing%Entrainment( nVertLevelsP1, nCells ), adcMixing%Detrainment( nVertLevelsP1, nCells ))
+      allocate( adcMixing%tumd( nVertLevelsP1, nCells ), adcMixing%sumd( nVertLevelsP1, nCells ))
+      allocate( adcMixing%wumd( nVertLevelsP1, nCells ))
+
+      adcMixing%KspsD(:,:) = KspsDTmp(:,:)
       adcMixing%KspsU = KspsUTmp
       adcMixing%ze = zeTmp
       adcMixing%zm = zmTmp
       adcMixing%eps = epsTmp
       adcMixing%length = lengthTmp
+      adcMixing%lenup = lenupTmp
+      adcMixing%lendn = lendnTmp
       adcMixing%lenspsD = lenspsDTmp
       adcMixing%lenspsU = lenspsUTmp
       adcMixing%KhU = KhUTmp
@@ -274,6 +309,50 @@ module ocn_turbulence
       call mpas_pool_get_array(adcTendPool, 'v2cliptend', v2cliptendTmp)
       call mpas_pool_get_array(adcTendPool, 'w2cliptend', w2cliptendTmp)
 
+      allocate( adcMixing%w2tend1( nVertLevelsP1, nCells ))
+      allocate( adcMixing%w2tend2( nVertLevelsP1, nCells ))
+      allocate( adcMixing%w2tend3( nVertLevelsP1, nCells ))
+      allocate( adcMixing%w2tend4( nVertLevelsP1, nCells ))
+      allocate( adcMixing%w2tend5( nVertLevelsP1, nCells ))
+      allocate( adcMixing%wttend1( nVertLevelsP1, nCells ))
+      allocate( adcMixing%wttend2( nVertLevelsP1, nCells ))
+      allocate( adcMixing%wttend3( nVertLevelsP1, nCells ))
+      allocate( adcMixing%wttend4( nVertLevelsP1, nCells ))
+      allocate( adcMixing%wttend5( nVertLevelsP1, nCells ))
+      allocate( adcMixing%wstend1( nVertLevelsP1, nCells ))
+      allocate( adcMixing%wstend2( nVertLevelsP1, nCells ))
+      allocate( adcMixing%wstend3( nVertLevelsP1, nCells ))
+      allocate( adcMixing%wstend4( nVertLevelsP1, nCells ))
+      allocate( adcMixing%wstend5( nVertLevelsP1, nCells ))
+      allocate( adcMixing%uwtend1( nVertLevelsP1, nCells ))
+      allocate( adcMixing%uwtend2( nVertLevelsP1, nCells ))
+      allocate( adcMixing%uwtend3( nVertLevelsP1, nCells ))
+      allocate( adcMixing%uwtend4( nVertLevelsP1, nCells ))
+      allocate( adcMixing%uwtend5( nVertLevelsP1, nCells ))
+      allocate( adcMixing%vwtend1( nVertLevelsP1, nCells ))
+      allocate( adcMixing%vwtend2( nVertLevelsP1, nCells ))
+      allocate( adcMixing%vwtend3( nVertLevelsP1, nCells ))
+      allocate( adcMixing%vwtend4( nVertLevelsP1, nCells ))
+      allocate( adcMixing%vwtend5( nVertLevelsP1, nCells ))
+      allocate( adcMixing%v2tend1( nVertLevelsP1, nCells ))
+      allocate( adcMixing%v2tend2( nVertLevelsP1, nCells ))
+      allocate( adcMixing%v2tend3( nVertLevelsP1, nCells ))
+      allocate( adcMixing%v2tend4( nVertLevelsP1, nCells ))
+      allocate( adcMixing%v2tend5( nVertLevelsP1, nCells ))
+      allocate( adcMixing%u2tend1( nVertLevelsP1, nCells ))
+      allocate( adcMixing%u2tend2( nVertLevelsP1, nCells ))
+      allocate( adcMixing%u2tend3( nVertLevelsP1, nCells ))
+      allocate( adcMixing%u2tend4( nVertLevelsP1, nCells ))
+      allocate( adcMixing%u2tend5( nVertLevelsP1, nCells ))
+      allocate( adcMixing%w3tend1( nVertLevels, nCells ))
+      allocate( adcMixing%w3tend2( nVertLevels, nCells ))
+      allocate( adcMixing%w3tend3( nVertLevels, nCells ))
+      allocate( adcMixing%w3tend4( nVertLevels, nCells ))
+      allocate( adcMixing%w3tend5( nVertLevels, nCells ))
+      allocate( adcMixing%u2cliptend( nVertLevelsP1, nCells ))
+      allocate( adcMixing%v2cliptend( nVertLevelsP1, nCells ))
+      allocate( adcMixing%w2cliptend( nVertLevelsP1, nCells ))
+
       adcMixing%w2tend1 = w2tend1Tmp
       adcMixing%w2tend2 = w2tend2Tmp
       adcMixing%w2tend3 = w2tend3Tmp
@@ -318,39 +397,90 @@ module ocn_turbulence
       adcMixing%v2cliptend = v2cliptendTmp
       adcMixing%w2cliptend = w2cliptendTmp
 
-      call mpas_pool_get_array(adcPrognosticsPool, 'u2', u2Tmp)
-      call mpas_pool_get_array(adcPrognosticsPool, 'v2', v2Tmp)
-      call mpas_pool_get_array(adcPrognosticsPool, 'w2', w2Tmp)
-      call mpas_pool_get_array(adcPrognosticsPool, 'wt', wtTmp)
-      call mpas_pool_get_array(adcPrognosticsPool, 'ws', wsTmp)
-      call mpas_pool_get_array(adcPrognosticsPool, 'uw', uwTmp)
-      call mpas_pool_get_array(adcPrognosticsPool, 'vw', vwTmp)
-      call mpas_pool_get_array(adcPrognosticsPool, 'w3', w3Tmp)
-      call mpas_pool_get_array(adcPrognosticsPool, 'uv', uvTmp)
-      call mpas_pool_get_array(adcPrognosticsPool, 't2', t2Tmp)
-      call mpas_pool_get_array(adcPrognosticsPool, 'ut', utTmp)
-      call mpas_pool_get_array(adcPrognosticsPool, 'vt', vtTmp)
-      call mpas_pool_get_array(adcPrognosticsPool, 'us', usTmp)
-      call mpas_pool_get_array(adcPrognosticsPool, 'vs', vsTmp)
-      call mpas_pool_get_array(adcPrognosticsPool, 'ts', tsTmp)
-      call mpas_pool_get_array(adcPrognosticsPool, 's2', s2Tmp)
+      call mpas_pool_get_array(adcPrognosticsPool, 'u2', u2Tmp, 1)
+      call mpas_pool_get_array(adcPrognosticsPool, 'v2', v2Tmp, 1)
+      call mpas_pool_get_array(adcPrognosticsPool, 'w2', w2Tmp, 1)
+      call mpas_pool_get_array(adcPrognosticsPool, 'wt', wtTmp, 1)
+      call mpas_pool_get_array(adcPrognosticsPool, 'ws', wsTmp, 1)
+      call mpas_pool_get_array(adcPrognosticsPool, 'uw', uwTmp, 1)
+      call mpas_pool_get_array(adcPrognosticsPool, 'vw', vwTmp, 1)
+      call mpas_pool_get_array(adcPrognosticsPool, 'w3', w3Tmp, 1)
+      call mpas_pool_get_array(adcPrognosticsPool, 'uv', uvTmp, 1)
+      call mpas_pool_get_array(adcPrognosticsPool, 't2', t2Tmp, 1)
+      call mpas_pool_get_array(adcPrognosticsPool, 'ut', utTmp, 1)
+      call mpas_pool_get_array(adcPrognosticsPool, 'vt', vtTmp, 1)
+      call mpas_pool_get_array(adcPrognosticsPool, 'us', usTmp, 1)
+      call mpas_pool_get_array(adcPrognosticsPool, 'vs', vsTmp, 1)
+      call mpas_pool_get_array(adcPrognosticsPool, 'ts', tsTmp, 1)
+      call mpas_pool_get_array(adcPrognosticsPool, 's2', s2Tmp, 1)
 
-      adcMixing%u2 = u2Tmp
-      adcMixing%v2 = v2Tmp
-      adcMixing%w2 = w2Tmp
-      adcMixing%wt = wtTmp
-      adcMixing%ws = wsTmp
-      adcMixing%uw = uwTmp
-      adcMixing%vw = vwTmp
-      adcMixing%w3 = w3Tmp
-      adcMixing%uv = uvTmp
-      adcMixing%t2 = t2Tmp
-      adcMixing%ut = utTmp
-      adcMixing%vt = vtTmp
-      adcMixing%us = usTmp
-      adcMixing%vs = vsTmp
-      adcMixing%ts = tsTmp
-      adcMixing%s2 = s2Tmp
+      allocate( adcMixing%u2( 2, nVertLevelsP1, nCells ) )
+      allocate( adcMixing%v2( 2, nVertLevelsP1, nCells ) )
+      allocate( adcMixing%w2( 2, nVertLevelsP1, nCells ) )
+      allocate( adcMixing%wt( 2, nVertLevelsP1, nCells ) )
+      allocate( adcMixing%ws( 2, nVertLevelsP1, nCells ) )
+      allocate( adcMixing%uw( 2, nVertLevelsP1, nCells ) )
+      allocate( adcMixing%vw( 2, nVertLevelsP1, nCells ) )
+      allocate( adcMixing%w3( 2, nVertLevels, nCells ) )
+      allocate( adcMixing%uv( 2, nVertLevelsP1, nCells ) )
+      allocate( adcMixing%t2( 2, nVertLevelsP1, nCells ) )
+      allocate( adcMixing%ut( 2, nVertLevelsP1, nCells ) )
+      allocate( adcMixing%vt( 2, nVertLevelsP1, nCells ) )
+      allocate( adcMixing%us( 2, nVertLevelsP1, nCells ) )
+      allocate( adcMixing%vs( 2, nVertLevelsP1, nCells ) )
+      allocate( adcMixing%ts( 2, nVertLevelsP1, nCells ) )
+      allocate( adcMixing%s2( 2, nVertLevelsP1, nCells ) )
+
+      adcMixing%u2(1,:,:) = u2Tmp
+      adcMixing%v2(1,:,:) = v2Tmp
+      adcMixing%w2(1,:,:) = w2Tmp
+      adcMixing%wt(1,:,:) = wtTmp
+      adcMixing%ws(1,:,:) = wsTmp
+      adcMixing%uw(1,:,:) = uwTmp
+      adcMixing%vw(1,:,:) = vwTmp
+      adcMixing%w3(1,:,:) = w3Tmp
+      adcMixing%uv(1,:,:) = uvTmp
+      adcMixing%t2(1,:,:) = t2Tmp
+      adcMixing%ut(1,:,:) = utTmp
+      adcMixing%vt(1,:,:) = vtTmp
+      adcMixing%us(1,:,:) = usTmp
+      adcMixing%vs(1,:,:) = vsTmp
+      adcMixing%ts(1,:,:) = tsTmp
+      adcMixing%s2(1,:,:) = s2Tmp
+
+      call mpas_pool_get_array(adcPrognosticsPool, 'u2', u2Tmp, 2)
+      call mpas_pool_get_array(adcPrognosticsPool, 'v2', v2Tmp, 2)
+      call mpas_pool_get_array(adcPrognosticsPool, 'w2', w2Tmp, 2)
+      call mpas_pool_get_array(adcPrognosticsPool, 'wt', wtTmp, 2)
+      call mpas_pool_get_array(adcPrognosticsPool, 'ws', wsTmp, 2)
+      call mpas_pool_get_array(adcPrognosticsPool, 'uw', uwTmp, 2)
+      call mpas_pool_get_array(adcPrognosticsPool, 'vw', vwTmp, 2)
+      call mpas_pool_get_array(adcPrognosticsPool, 'w3', w3Tmp, 2)
+      call mpas_pool_get_array(adcPrognosticsPool, 'uv', uvTmp, 2)
+      call mpas_pool_get_array(adcPrognosticsPool, 't2', t2Tmp, 2)
+      call mpas_pool_get_array(adcPrognosticsPool, 'ut', utTmp, 2)
+      call mpas_pool_get_array(adcPrognosticsPool, 'vt', vtTmp, 2)
+      call mpas_pool_get_array(adcPrognosticsPool, 'us', usTmp, 2)
+      call mpas_pool_get_array(adcPrognosticsPool, 'vs', vsTmp, 2)
+      call mpas_pool_get_array(adcPrognosticsPool, 'ts', tsTmp, 2)
+      call mpas_pool_get_array(adcPrognosticsPool, 's2', s2Tmp, 2)
+
+      adcMixing%u2(2,:,:) = u2Tmp
+      adcMixing%v2(2,:,:) = v2Tmp
+      adcMixing%w2(2,:,:) = w2Tmp
+      adcMixing%wt(2,:,:) = wtTmp
+      adcMixing%ws(2,:,:) = wsTmp
+      adcMixing%uw(2,:,:) = uwTmp
+      adcMixing%vw(2,:,:) = vwTmp
+      adcMixing%w3(2,:,:) = w3Tmp
+      adcMixing%uv(2,:,:) = uvTmp
+      adcMixing%t2(2,:,:) = t2Tmp
+      adcMixing%ut(2,:,:) = utTmp
+      adcMixing%vt(2,:,:) = vtTmp
+      adcMixing%us(2,:,:) = usTmp
+      adcMixing%vs(2,:,:) = vsTmp
+      adcMixing%ts(2,:,:) = tsTmp
+      adcMixing%s2(2,:,:) = s2Tmp
       block => block % next
    end do
 !   at end could do a copy to accelerator
@@ -403,6 +533,8 @@ module ocn_turbulence
                  adcMixing%zm,       &
                  adcMixing%eps,      &
                  adcMixing%length,   &
+                 adcMixing%lenup,    &
+                 adcMixing%lendn,    &
                  adcMixing%lenspsD,  &
                  adcMixing%lenspsU,  &
                  adcMixing%KhU,      &

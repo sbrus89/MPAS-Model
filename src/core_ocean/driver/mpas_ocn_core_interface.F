@@ -126,6 +126,7 @@ module ocn_core_interface
       logical, pointer :: gmActive
       logical, pointer :: timeVaryingAtmosphericForcingPKGActive
       logical, pointer :: timeVaryingLandIceForcingPKGActive
+      logical, pointer :: adcMixingPKGActive
 
       type (mpas_pool_iterator_type) :: pkgItr
       logical, pointer :: packageActive
@@ -159,6 +160,7 @@ module ocn_core_interface
       character (len=StrKIND), pointer :: config_pressure_gradient_type
       character (len=StrKIND), pointer :: config_sw_absorption_type
 
+      logical, pointer :: config_adc_enable
       logical, pointer :: config_use_bulk_wind_stress
       logical, pointer :: config_use_bulk_thickness_flux
       logical, pointer :: config_compute_active_tracer_budgets
@@ -219,6 +221,14 @@ module ocn_core_interface
       call mpas_pool_get_config(configPool, 'config_use_bulk_thickness_flux', config_use_bulk_thickness_flux)
       if ( config_use_bulk_thickness_flux ) then
          thicknessBulkPKGActive = .true.
+      end if
+
+      !
+      ! Test if new assumed distribution closure is active
+      call mpas_pool_get_package(packagePool, 'adcMixingPKGActive', adcMixingPKGActive)
+      call mpas_pool_get_config(configPool, 'config_adc_enable', config_adc_enable)
+      if ( config_adc_enable ) then
+        adcMixingPKGActive = .true.
       end if
 
       !

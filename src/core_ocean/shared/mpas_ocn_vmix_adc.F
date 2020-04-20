@@ -18,7 +18,12 @@ module ocn_vmix_adc
    use mpas_timer
    use mpas_constants
    use mpas_log
+   use mpas_vector_reconstruction
+   use mpas_timekeeping
 
+   use ocn_adc_mixing
+   use ocn_surface_bulk_forcing
+   use ocn_surface_land_ice_fluxes
    use ocn_turbulence
    use ocn_constants
    use ocn_config
@@ -52,7 +57,11 @@ module ocn_vmix_adc
    integer :: i1, i2
    logical :: adcOn
    real (kind=RKIND) :: backgroundVisc, backgroundDiff
-
+   integer, parameter :: num_water_types = 5
+   real (kind=RKIND), dimension(num_water_types) ::                       &
+      rfac   = (/ 0.58_RKIND, 0.62_RKIND, 0.67_RKIND, 0.77_RKIND, 0.78_RKIND /), &
+      depth1 = (/ 0.35_RKIND, 0.60_RKIND, 1.00_RKIND, 1.50_RKIND, 1.40_RKIND /), &
+      depth2 = (/ 23.0_RKIND, 20.0_RKIND, 17.0_RKIND, 14.0_RKIND, 7.90_RKIND /)
 
 !***********************************************************************
 
@@ -71,7 +80,7 @@ contains
 !
 !-----------------------------------------------------------------------
 
-   subroutine ocn_vmix_adc_mix(meshPool, statePool, forcingPool, diagnosticsPool, adcMixingPool, &
+   subroutine ocn_vmix_adc_mix(meshPool, statePool, forcingPool, diagnosticsPool, adcMixingPool, dt, &
        err, timeLevelIn)!{{{
 
       !-----------------------------------------------------------------
@@ -103,6 +112,7 @@ contains
       type (mpas_pool_type), intent(inout) :: &
          adcMixingPool !< INput/Output: turbulence arrays
 
+      real(KIND=RKIND), intent(in) :: dt
       !-----------------------------------------------------------------
       !
       ! output variables
@@ -121,35 +131,29 @@ contains
         maxLevelCell, nEdgesOnCell
 
       real (kind=RKIND), dimension(:), pointer :: &
-        latCell, lonCell, bottomDepth, surfaceBuoyancyForcing, surfaceFrictionVelocity, fCell, &
-        boundaryLayerDepth, ssh, indexBoundaryLayerDepth, dcEdge, dvEdge, areaCell, iceFraction, &
-        boundaryLayerDepthSmooth, windSpeed10m
+        stressX, stressY, stressZ, stressZonal, stressMeridional, fCell, &
+        surfaceStress, surfaceStressMagnitude, bottomDepth,  &
+        penetrativeTemperatureFlux, angleEdge, surfaceThicknessFlux, &
+        surfaceThicknessFluxRunoff, dThreshMLD
 
       real (kind=RKIND), dimension(:,:), pointer :: &
-        vertViscTopOfCell, vertDiffTopOfCell, layerThickness, &
-        zMid, zTop, density, displacedDensity, potentialDensity, &
-        bulkRichardsonNumber, RiTopOfCell, BruntVaisalaFreqTop, &
-        bulkRichardsonNumberBuoy, bulkRichardsonNumberShear, unresolvedShear, normalVelocity
+        layerThickness, velocityZonal, velocityMeridional, &
+        tracerGroupSurfaceFlux, tracerGroupSurfaceFluxRunoff, &
+        tracerGroupSurfaceFluxRemoved, BruntVaisalaFreqTop,  &
+        inSituThermalExpansionCoeff, inSituSalinityContractionCoeff
 
-      real (kind=RKIND), dimension(:,:,:), pointer :: vertNonLocalFlux
-      integer, pointer :: index_vertNonLocalFluxTemp, config_cvmix_num_ri_smooth_loops
-      integer, dimension(:,:), pointer :: edgesOnCell, cellsOnCell, cellMask
+      real (kind=RKIND), dimension(:,:,:), pointer :: activeTracers
+      integer, pointer :: indexTemperature, indexSalinity
 
       integer :: k, i, iCell, jCell, iNeighbor, iter, timeLevel, kIndexOBL, kav, iEdge, nCells
-      integer :: edgeCount, nEdges, topIndex, nsmooth, kpp_stage
       integer, pointer :: nVertLevels, nVertLevelsP1
       integer, dimension(:), pointer :: nCellsArray
-      integer, dimension(:), allocatable :: surfaceAverageIndex
 
-      real (kind=RKIND) :: r, layerSum, bulkRichardsonNumberStop, sfc_layer_depth, invAreaCell
-      real (kind=RKIND) :: normalVelocityAv, factor, delU2, areaSum, blTemp
-      real (kind=RKIND) :: sigma, turbulentScalarVelocityScalePoint
-      real (kind=RKIND), dimension(:), allocatable :: Nsqr_iface, turbulentScalarVelocityScale, &
-                                                      deltaVelocitySquared, normalVelocitySum, &
-                                                      potentialDensitySum, RiTemp
-      real (kind=RKIND), dimension(:), allocatable, target :: RiSmoothed, BVFSmoothed, OBLDepths, interfaceForcings
-      logical :: bulkRichardsonFlag
+     real (kind=RKIND), dimension(:), allocatable :: zonalAverage, meridionalAverage, uw_sfc, &
+                           vw_sfc, latVal, ws_sfc, wt_sfc
 
+      real (kind=RKIND) :: fac, dep1, dep2, fracAbsorbed, fracAbsorbedRunoff,  &
+                           etime
 
       !-----------------------------------------------------------------
       !
@@ -178,54 +182,117 @@ contains
       call mpas_pool_get_dimension(meshPool, 'nVertLevels', nVertLevels)
       call mpas_pool_get_dimension(meshPool, 'nVertLevelsP1', nVertLevelsP1)
       call mpas_pool_get_dimension(meshPool, 'nCellsArray', nCellsArray)
-      call mpas_pool_get_array(meshPool, 'dcEdge', dcEdge)
-      call mpas_pool_get_array(meshPool, 'dvEdge', dvEdge)
       call mpas_pool_get_array(meshPool, 'nEdgesOnCell', nEdgesOnCell)
-      call mpas_pool_get_array(meshPool, 'areaCell', areaCell)
-      call mpas_pool_get_array(statePool, 'normalVelocity', normalVelocity, timeLevel)
-      call mpas_pool_get_array(meshPool, 'edgesOnCell', edgesOnCell)
-      call mpas_pool_get_array(meshPool, 'cellsOnCell', cellsOnCell)
-      call mpas_pool_get_array(meshPool, 'cellMask', cellMask)
-
       !
       ! set pointers for fields related to position on sphere
       !
-      call mpas_pool_get_array(meshPool, 'latCell', latCell)
-      call mpas_pool_get_array(meshPool, 'lonCell', lonCell)
-      call mpas_pool_get_array(meshPool, 'fCell', fCell)
+      call mpas_pool_get_subpool(statePool, 'tracers', tracersPool)
+      call mpas_pool_get_array(tracersPool, 'activeTracers', activeTracers, timeLevel)
+      call mpas_pool_get_dimension(tracersPool, 'index_temperature', indexTemperature)
+      call mpas_pool_get_dimension(tracersPool, 'index_salinity', indexSalinity)
 
+      call mpas_pool_get_array(tracersSurfaceFluxPool, "activeTracersSurfaceFlux", tracerGroupSurfaceFlux)
+      call mpas_pool_get_array(tracersSurfaceFluxPool, "activeTracersSurfaceFluxRunoff", tracerGroupSurfaceFluxRunoff)
+      call mpas_pool_get_array(tracersSurfaceFluxPool, "activeTracersSurfaceFluxRemoved", tracerGroupSurfaceFluxRemoved)
+      call mpas_pool_get_array(forcingPool, "surfaceThicknessFlux", surfaceThicknessFlux)
+      call mpas_pool_get_array(forcingPool, "surfaceThicknessFluxRunoff", surfaceThicknessFluxRunoff)
+
+      call mpas_pool_get_array(diagnosticsPool, 'inSituThermalExpansionCoeff', inSituThermalExpansionCoeff)
+      call mpas_pool_get_array(diagnosticsPool, 'inSituSalinityContractionCoeff', inSituSalinityContractionCoeff)
+      call mpas_pool_get_array(diagnosticsPool, 'BruntVaisalaFreqTop', BruntVaisalaFreqTop)
+      call mpas_pool_get_array(diagnosticsPool, 'velocityZonal', velocityZonal)
+      call mpas_pool_get_array(diagnosticsPool, 'velocityMeridional', velocityMeridional)
+      call mpas_pool_get_array(mixedLayerDepthsAMPool, 'dThreshMLD', dThreshMLD)
+      !
+      call mpas_pool_get_array(meshPool, 'fCell', fCell)
       !
       ! set pointers for fields related to vertical mesh
       !
       call mpas_pool_get_array(meshPool, 'maxLevelCell', maxLevelCell)
       call mpas_pool_get_array(meshPool, 'bottomDepth', bottomDepth)
-
       call mpas_pool_get_array(statePool, 'layerThickness', layerThickness, timeLevel)
-      call mpas_pool_get_array(statePool, 'ssh', ssh, timeLevel)
-
-      call mpas_pool_get_array(diagnosticsPool, 'zTop', zTop)
-      call mpas_pool_get_array(diagnosticsPool, 'zMid', zMid)
-
       !
       ! set pointers for fields related ocean state
       !
-      call mpas_pool_get_array(diagnosticsPool, 'density', density)
-      call mpas_pool_get_array(diagnosticsPool, 'displacedDensity', displacedDensity)
-      call mpas_pool_get_array(diagnosticsPool, 'potentialDensity', potentialDensity)
       call mpas_pool_get_array(diagnosticsPool, 'BruntVaisalaFreqTop',BruntVaisalaFreqTop)
 
-      !
-      ! set pointers for fields related forcing at ocean surface
-      !
-      call mpas_pool_get_array(diagnosticsPool, 'surfaceFrictionVelocity', surfaceFrictionVelocity)
-      call mpas_pool_get_array(diagnosticsPool, 'surfaceBuoyancyForcing', surfaceBuoyancyForcing)
+      ! need to use RBFs to get stress at cell centers
+      call mpas_pool_get_array(forcingPool, 'windStressZonal', stressZonal)
+      call mpas_pool_get_array(forcingPool, 'windStressMeridional', stressMeridional)
+      call mpas_pool_get_array(diagnosticsPool, 'stressX', stressX)
+      call mpas_pool_get_array(diagnosticsPool, 'stressY', stressY)
+      call mpas_pool_get_array(diagnosticsPool, 'stressZ', stressZ)
 
-      nCells = nCellsArray( size(nCellsArray) )
+      call mpas_pool_get_array(forcingPool, 'surfaceStress', surfaceStress)
+      call mpas_pool_get_array(forcingPool, 'surfaceStressMagnitude', surfaceStressMagnitude)
 
-      nCells = nCellsArray( 3 )
-      do iCell = 1,nCells
-               ! fill vertical position of column
-         ! CVMix assume top of ocean is at z=0, so building all z-coordinate data based on layerThickness
+      allocate(zonalAverage(nVertLevels),meridionalAverage(nVertLevels))
+
+      nCells = nCellsArray( 2 )
+      nEdges = nEdgesArray( 1 )
+
+      allocate(uw_sfc(nCells), vw_sfc(nCells), ws_sfc(nCells), wt_sfc(nCells))
+      !$omp do schedule(runtime)
+      do iEdge=1,nEdges
+         surfaceStress(iEdge) = 0.0_RKIND
+      enddo
+      !$omp end do
+
+      !$omp do schedule(runtime)
+      do iCell = 1, nCells
+         surfaceThicknessFlux(iCell) = 0.0_RKIND
+         surfaceThicknessFluxRunoff(iCell) = 0.0_RKIND
+         surfaceStressMagnitude(iCell) = 0.0_RKIND
+         tracerGroupSurfaceFluxRunoff(:, iCell) = 0.0_RKIND
+         tracerGroupSurfaceFlux(:, iCell) = 0.0_RKIND
+         tracerGroupSurfaceFluxRemoved(:, iCell) = 0.0_RKIND
+      end do
+      !$omp end do
+
+      call ocn_surface_bulk_forcing_vel(meshPool, forcingPool, surfaceStress, surfaceStressMagnitude, err)
+
+      call ocn_surface_land_ice_fluxes_vel(meshPool, diagnosticsPool, surfaceStress, surfaceStressMagnitude, err)
+
+      if(config_use_activeTracers_surface_bulk_forcing) then
+        call ocn_surface_bulk_forcing_tracers(meshPool, "activeTracers", forcingPool, activeTracers,  &
+                                            tracerGroupSurfaceFlux, tracerGroupSurfaceFluxRunoff, &
+                                            tracerGroupSurfaceFluxRemoved, dt, layerThickness, err)
+      endif
+
+      call ocn_surface_land_ice_fluxes_tracers(meshPool, "activeTracers", forcingPool, tracerGroupSurfaceFlux, err)
+
+      call ocn_surface_bulk_forcing_thick(meshPool, forcingPool, surfaceThicknessFlux, surfaceThicknessFluxRunoff, err)
+
+      !need surface thickness flux too
+
+      call mpas_pool_get_array(forcingPool, 'penetrativeTemperatureFlux', penetrativeTemperatureFlux)
+
+      fac = rfac(config_jerlov_water_type)
+      dep1 = depth1(config_jerlov_water_type)
+      dep2 = depth2(config_jerlov_water_type)
+
+      !$omp do schedule(runtime)
+      do iCell = 1, nCells
+
+         fracAbsorbed = 1.0_RKIND - exp( max(-layerThickness(1, iCell) / config_flux_attenuation_coefficient, -100.0_RKIND) )
+         fracAbsorbedRunoff = 1.0_RKIND - exp( max(-layerThickness(1, iCell) / config_flux_attenuation_coefficient_runoff, &
+                              -100.0_RKIND) )
+
+         wt_sfc(iCell) = tracerGroupSurfaceFlux(indexTemperature, iCell) - fracAbsorbed * surfaceThicknessFlux(iCell) * &
+                        activeTracers(indexTemperature,1,iCell) + tracerGroupSurfaceFluxRunoff(indexTemperature,iCell) * &
+                        fracAbsorbedRunoff
+
+         ws_sfc(iCell) = tracerGroupSurfaceFlux(indexSalinity, iCell) - fracAbsorbed * surfaceThicknessFlux(iCell) *  &
+                        activeTracers(indexSalinity,1,iCell)
+
+         uw_sfc(iCell) = stressZonal(iCell) / rho_sw
+
+         if(abs(stressMeridional(iCell)) < 1e-6_RKIND) then
+                 stressMeridional(iCell) = 0.0_RKIND
+         endif
+
+         vw_sfc(iCell) = stressMeridional(iCell) / rho_sw
+
          adcMixing % ze(1,iCell) = 0.0_RKIND
          adcMixing % zm(1,iCell) = -layerThickness(1,iCell)/2.0_RKIND
          do k=2,maxLevelCell(iCell)
@@ -238,7 +305,14 @@ contains
             adcMixing % ze(k+1,iCell) = adcMixing % ze(maxLevelCell(iCell)+1,iCell)
             adcMixing % zm(k,iCell) = adcMixing % ze(maxLevelCell(iCell)+1,iCell)
          enddo
+
      enddo
+     !$omp end do
+     !call the individual ADC function and pass the array members maybe?  probably not
+     !this will update T in place, so verify it sends time level n+1
+     call ADC_main_loop(nCells, nVertLevels, dt, activeTracers, velocityZonal, velocityMeridional, &
+          BruntVaisalaFreqTop, uw_sfc, vw_sfc, wt_sfc, ws_sfc, inSituThermalExpansionCoeff,        &
+          inSituSalinityContractionCoeff, fCell)
 
          !--------------------------------------------------------------------
 
@@ -274,12 +348,14 @@ contains
       type (domain_type), intent(inout) :: domain !< Input/Output: domain information
       type (mpas_pool_type), pointer :: meshPool
       type (block_type), pointer :: block
+      type (MPAS_TimeInterval_type) :: timeStep
       integer, intent(out) :: err !< Output: error flag
 
       integer, pointer :: nVertLevels
       integer :: k, iCell, nCells
       integer, dimension(:), pointer :: nCellsArray
 
+      real(KIND=RKIND) :: dt, numiterations
       real, dimension(:,:), pointer :: KspsU, KspsD, w2New, sigma, tumd, sumd,  wumd, uwNew, &
             vwNew, u2New, v2New, uvNew, utNew, vtNew, vsNew, usNew, length, w2Cur, uwCur,    &
             vwCur, u2Cur, v2Cur, uvCur, utCur, vtCur, vsCur, usCur
@@ -296,9 +372,24 @@ contains
       !
       if (.not.config_adc_enable) return
 
+      if(config_use_cvmix) then
+        call mpas_log_write( "Cannot use ADC mixing and CVMix at the same time:" // &
+               "set either config_use_cvmix or config_adc_enable to .false.", MPAS_LOG_CRIT)
+      endif
       !
       ! pull nVertLevels out of the mesh structure
       !
+
+      timeStep = mpas_get_clock_timestep(domain % clock, ierr=err_tmp)
+      call mpas_get_timeInterval(timeStep, dt=dt)
+
+      if ( mod(dt, config_adc_timestep) .ne. 0 ) then
+         numiterations = ceiling(dt, config_adc_timestep)
+         config_adc_timestep = dt / numiterations
+          call mpas_log_write( "WARNING: timestep for ADC scheme was not an even multiple of" \\
+               "config_dt, config_adc_timestep has been reset appropriately", MPAS_LOG_WARN)
+      end if
+
       call mpas_pool_get_dimension(domain % blocklist % dimensions, 'nVertLevels', nVertLevels)
 
       call ocn_turbulenceCreate(domain)
