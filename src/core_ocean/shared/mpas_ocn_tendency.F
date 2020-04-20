@@ -52,6 +52,7 @@ module ocn_tendency
    use ocn_thick_vadv
    use ocn_thick_surface_flux
 
+   use ocn_config
    use ocn_vel_hadv_coriolis
    use ocn_vel_pressure_grad
    use ocn_vel_vadv
@@ -189,7 +190,7 @@ contains
       call ocn_frazil_forcing_layer_thickness(meshPool, forcingPool, tend_layerThickness, err)
 
       !
-      ! tidal boundary condition flux 
+      ! tidal boundary condition flux
       !
       call ocn_tidal_forcing_layer_thickness(meshPool, forcingPool, tend_layerThickness, err)
 
@@ -224,7 +225,7 @@ contains
       type (mpas_pool_type), pointer :: tracersPool
 
       real (kind=RKIND), dimension(:), pointer :: surfaceStress, surfaceStressMagnitude, surfaceFluxAttenuationCoefficient, ssh
-      real (kind=RKIND), dimension(:), pointer :: tidalPotentialEta 
+      real (kind=RKIND), dimension(:), pointer :: tidalPotentialEta
       real (kind=RKIND), dimension(:,:), pointer :: &
         layerThicknessEdge, normalVelocity, tangentialVelocity, density, potentialDensity, zMid, pressure, &
         layerThickness, &
@@ -248,7 +249,7 @@ contains
       logical, pointer :: config_use_tidal_potential_forcing
       character (len=StrKIND), pointer :: config_pressure_gradient_type
       character (len=StrKIND), pointer :: config_time_integrator
-      real (kind=RKIND), pointer :: config_self_attraction_and_loading_beta 
+      real (kind=RKIND), pointer :: config_self_attraction_and_loading_beta
 
       if (present(timeLevelIn)) then
          timeLevel = timeLevelIn
@@ -337,8 +338,8 @@ contains
       call ocn_vel_vadv_tend(meshPool, normalVelocity, layerThicknessEdge, vertAleTransportTop, tend_normalVelocity, err)
 
       !
-      ! velocity tendency: tidal potential (if needed) 
-      !   For RK4, subtract the tidal potential from the zMid array and store in a work array, 
+      ! velocity tendency: tidal potential (if needed)
+      !   For RK4, subtract the tidal potential from the zMid array and store in a work array,
       !   Then point zMid to work array so the tidal potential terms are included inside the grad computed in ocn_vel_pressure_grad_tend
       !   zMid is pointed back to the typical value afterward, so the work array is not used in place of zMid elsewhere.
       !
@@ -355,7 +356,7 @@ contains
           do k = 1, maxLevelCell(iCell)
             tidalPotentialZMid(k,iCell) = zMid(k,iCell) - tidalPotentialEta(iCell) &
                                         - config_self_attraction_and_loading_beta * zMid(k,iCell)
-          end do 
+          end do
         end do
 
         call mpas_pool_get_array(forcingPool, 'tidalPotentialZMid', zMid)

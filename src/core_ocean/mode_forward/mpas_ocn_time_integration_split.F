@@ -121,7 +121,7 @@ module ocn_time_integration_split
       real (kind=RKIND), dimension(:), allocatable:: uTemp
       real (kind=RKIND), dimension(:), pointer :: btrvel_temp
       type (field1DReal), pointer :: btrvel_tempField
-      logical :: activeTracersOnly ! if true only compute tendencies for active tracers  
+      logical :: activeTracersOnly ! if true only compute tendencies for active tracers
       integer :: tsIter
       integer :: edgeHaloComputeCounter, cellHaloComputeCounter
       integer :: neededHalos
@@ -196,7 +196,7 @@ module ocn_time_integration_split
       real (kind=RKIND), dimension(:), pointer :: gradSSHX, gradSSHY, gradSSHZ
       real (kind=RKIND), dimension(:), pointer :: gradSSHZonal, gradSSHMeridional
       real (kind=RKIND), dimension(:,:), pointer :: surfaceVelocity, SSHGradient
-      real (kind=RKIND), dimension(:), pointer :: tidalPotentialEta 
+      real (kind=RKIND), dimension(:), pointer :: tidalPotentialEta
 
       ! Diagnostics Field Pointers
       type (field2DReal), pointer :: normalizedRelativeVorticityEdgeField, divergenceField, relativeVorticityField
@@ -1028,7 +1028,7 @@ module ocn_time_integration_split
 
                    ! Subtract tidal potential from ssh, if needed
                    !   Subtract the tidal potential from the current and new subcycle ssh and store and a work arrays.
-                   !   Then point sshSubcycleCur and  ssh SubcycleNew to the work arrays so the tidal potential terms 
+                   !   Then point sshSubcycleCur and  ssh SubcycleNew to the work arrays so the tidal potential terms
                    !   are included in the grad operator inside the edge loop.
                    if (config_use_tidal_potential_forcing) then
                      call mpas_pool_get_array(forcingPool,'sshSubcycleCurWithTides', sshSubcycleCurWithTides)
@@ -1826,7 +1826,8 @@ module ocn_time_integration_split
         if (config_use_standardGM) then
            call ocn_gm_compute_Bolus_velocity(diagnosticsPool, meshPool, scratchPool)
         end if
-        call ocn_vmix_implicit(dt, meshPool, diagnosticsPool, statePool, forcingPool, scratchPool, err, 2)
+        call ocn_vmix_implicit(dt, meshPool, diagnosticsPool, statePool, forcingPool, &
+            scratchPool, err, 2)
 
         block => block % next
       end do

@@ -33,6 +33,7 @@ module ocn_vmix
    use ocn_vmix_coefs_rich
    use ocn_vmix_cvmix
    use ocn_vmix_coefs_redi
+   use ocn_config
 
    implicit none
    private
@@ -631,7 +632,8 @@ contains
 !
 !-----------------------------------------------------------------------
 
-   subroutine ocn_vmix_implicit(dt, meshPool, diagnosticsPool, statePool, forcingPool, scratchPool, err, timeLevelIn)!{{{
+   subroutine ocn_vmix_implicit(dt, meshPool, diagnosticsPool, statePool, &
+     forcingPool, scratchPool, err, timeLevelIn)!{{{
       real (kind=RKIND), intent(in) :: dt
       type (mpas_pool_type), intent(in) :: meshPool
       type (mpas_pool_type), intent(inout) :: diagnosticsPool
@@ -710,8 +712,8 @@ contains
       call mpas_timer_stop('vmix coefs')
 
       if(config_adc_enable) then
-        call ocn_vmix_adc_mix(meshPool, statePool, forcingPool, diagnosticsPool, adcMixingPool, dt, &
-               ierr, 2)
+        call ocn_vmix_adc_mix(meshPool, statePool, forcingPool, diagnosticsPool, dt, &
+               err, 2)
       else
         nCells = nCellsArray(1)
         call mpas_pool_get_array(diagnosticsPool, 'vertNonLocalFlux', vertNonLocalFlux)

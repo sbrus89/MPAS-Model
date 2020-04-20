@@ -2,7 +2,7 @@
 !
 !  ocn_vmix_adc
 !
-!> \brief MPAS ocean vertical mixing interface to new ADC closure 
+!> \brief MPAS ocean vertical mixing interface to new ADC closure
 !> \author Luke Van Roekel
 !> \date   10 April 2020
 !> \details
@@ -54,7 +54,6 @@ module ocn_vmix_adc
    !
    !--------------------------------------------------------------------
 
-   integer :: i1, i2
    logical :: adcOn
    real (kind=RKIND) :: backgroundVisc, backgroundDiff
    integer, parameter :: num_water_types = 5
@@ -80,8 +79,8 @@ contains
 !
 !-----------------------------------------------------------------------
 
-   subroutine ocn_vmix_adc_mix(meshPool, statePool, forcingPool, diagnosticsPool, adcMixingPool, dt, &
-       err, timeLevelIn)!{{{
+   subroutine ocn_vmix_adc_mix(meshPool, statePool, forcingPool, diagnosticsPool, &
+      dt, err, timeLevelIn)!{{{
 
       !-----------------------------------------------------------------
       !
@@ -109,8 +108,7 @@ contains
       type (mpas_pool_type), intent(inout) :: &
          forcingPool   !< Input/Output: forcing information
 
-      type (mpas_pool_type), intent(inout) :: &
-         adcMixingPool !< INput/Output: turbulence arrays
+      type (mpas_pool_type), pointer :: tracersPool, tracersSurfaceFluxPool
 
       real(KIND=RKIND), intent(in) :: dt
       !-----------------------------------------------------------------
@@ -134,7 +132,7 @@ contains
         stressX, stressY, stressZ, stressZonal, stressMeridional, fCell, &
         surfaceStress, surfaceStressMagnitude, bottomDepth,  &
         penetrativeTemperatureFlux, angleEdge, surfaceThicknessFlux, &
-        surfaceThicknessFluxRunoff, dThreshMLD
+        surfaceThicknessFluxRunoff
 
       real (kind=RKIND), dimension(:,:), pointer :: &
         layerThickness, velocityZonal, velocityMeridional, &
@@ -145,9 +143,10 @@ contains
       real (kind=RKIND), dimension(:,:,:), pointer :: activeTracers
       integer, pointer :: indexTemperature, indexSalinity
 
-      integer :: k, i, iCell, jCell, iNeighbor, iter, timeLevel, kIndexOBL, kav, iEdge, nCells
+      integer :: k, i, iCell, jCell, iNeighbor, iter, timeLevel, kIndexOBL,  &
+            ntracers, kav, iEdge, nCells, nEdges
       integer, pointer :: nVertLevels, nVertLevelsP1
-      integer, dimension(:), pointer :: nCellsArray
+      integer, dimension(:), pointer :: nCellsArray, nEdgesArray
 
      real (kind=RKIND), dimension(:), allocatable :: zonalAverage, meridionalAverage, uw_sfc, &
                            vw_sfc, latVal, ws_sfc, wt_sfc
@@ -186,6 +185,8 @@ contains
       !
       ! set pointers for fields related to position on sphere
       !
+      call mpas_pool_get_subpool(forcingPool, 'tracersSurfaceFlux', tracersSurfaceFluxPool)
+
       call mpas_pool_get_subpool(statePool, 'tracers', tracersPool)
       call mpas_pool_get_array(tracersPool, 'activeTracers', activeTracers, timeLevel)
       call mpas_pool_get_dimension(tracersPool, 'index_temperature', indexTemperature)
@@ -202,7 +203,6 @@ contains
       call mpas_pool_get_array(diagnosticsPool, 'BruntVaisalaFreqTop', BruntVaisalaFreqTop)
       call mpas_pool_get_array(diagnosticsPool, 'velocityZonal', velocityZonal)
       call mpas_pool_get_array(diagnosticsPool, 'velocityMeridional', velocityMeridional)
-      call mpas_pool_get_array(mixedLayerDepthsAMPool, 'dThreshMLD', dThreshMLD)
       !
       call mpas_pool_get_array(meshPool, 'fCell', fCell)
       !
@@ -310,7 +310,8 @@ contains
      !$omp end do
      !call the individual ADC function and pass the array members maybe?  probably not
      !this will update T in place, so verify it sends time level n+1
-     call ADC_main_loop(nCells, nVertLevels, dt, activeTracers, velocityZonal, velocityMeridional, &
+     ntracers = size(activeTracers, dim=1)
+     call ADC_main_loop(nCells, nVertLevels, ntracers, dt, activeTracers, velocityZonal, velocityMeridional, &
           BruntVaisalaFreqTop, uw_sfc, vw_sfc, wt_sfc, ws_sfc, inSituThermalExpansionCoeff,        &
           inSituSalinityContractionCoeff, fCell)
 
@@ -352,8 +353,8 @@ contains
       integer, intent(out) :: err !< Output: error flag
 
       integer, pointer :: nVertLevels
-      integer :: k, iCell, nCells
-      integer, dimension(:), pointer :: nCellsArray
+      integer :: k, iCell, nCells, err_tmp, nEdges
+      integer, dimension(:), pointer :: nCellsArray, nEdgesArray
 
       real(KIND=RKIND) :: dt, numiterations
       real, dimension(:,:), pointer :: KspsU, KspsD, w2New, sigma, tumd, sumd,  wumd, uwNew, &
@@ -384,9 +385,9 @@ contains
       call mpas_get_timeInterval(timeStep, dt=dt)
 
       if ( mod(dt, config_adc_timestep) .ne. 0 ) then
-         numiterations = ceiling(dt, config_adc_timestep)
+         numiterations = ceiling(dt/config_adc_timestep)
          config_adc_timestep = dt / numiterations
-          call mpas_log_write( "WARNING: timestep for ADC scheme was not an even multiple of" \\
+          call mpas_log_write( "WARNING: timestep for ADC scheme was not an even multiple of" // &
                "config_dt, config_adc_timestep has been reset appropriately", MPAS_LOG_WARN)
       end if
 

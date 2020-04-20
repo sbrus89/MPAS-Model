@@ -4,6 +4,7 @@ module ocn_adc_mixing
   use ocn_constants
   use ocn_turbulence
   use mpas_log
+  use ocn_config
 
   implicit none
 
@@ -79,10 +80,9 @@ module ocn_adc_mixing
 
   end subroutine build_diagnostic_arrays
 
-  subroutine dissipation_lengths2(nCells,nVertLevels,activeTracers,alphaT,betaS,zedge)
+  subroutine dissipation_lengths2(nCells,nVertLevels,activeTracers,alphaT,betaS)
     integer,intent(in) :: nCells, nVertLevels
     real,dimension(2,nVertLevels,nCells),intent(in) :: activeTracers
-    real,dimension(nVertLevels+1,nCells),intent(in) :: zedge
     real,dimension(nVertLevels,nCells),intent(in) :: alphaT, betaS
     integer :: i,k, ij
 
@@ -104,7 +104,7 @@ module ocn_adc_mixing
           sudav = 0.5*(adcMixing%sumd(k,i) + adcMixing%sumd(k+1,i))
 
           Tup = activeTracers(1,k,i) + (1.0_RKIND - sav)*tudav
-          Tdo = activeTracers(1,k,i) - sav*tudav 
+          Tdo = activeTracers(1,k,i) - sav*tudav
           Sup = activeTracers(2,k,i) + (1.0_RKIND - sav)*sudav
           Sdo = activeTracers(2,k,i) - sav*sudav
 
@@ -138,14 +138,14 @@ module ocn_adc_mixing
                 sumv = sumv - (BupEdge(k) - Bup(ij))*(adcMixing%ze(ij,i)-adcMixing%ze(ij+1,i))**2.0/2.0
                 adcMixing%lenup(k,i) = adcMixing%lenup(k,i) - abs(adcMixing%ze(ij,i)-adcMixing%ze(ij+1,i))
 !                lenup(k,i) = max(0.55,lenup(k,i) + abs((z1-zV)/(s1 - sumv)*(tke(k)-sumv)))
-                if(Bup(k-1) - Bup(k) < 0) then 
+                if(Bup(k-1) - Bup(k) < 0) then
                         minlen = abs(adcMixing%zm(k-1,i) - adcMixing%zm(k,i))
                 else
                         minlen = 0.5_RKIND
                 endif
                 adcMixing%lenup(k,i) = max(minlen, adcMixing%lenup(k,i) + sqrt(2.0_RKIND/(BupEdge(k) -         &
                                 Bup(ij-1))*(tke(k) - sumv)))
-                exit   
+                exit
              endif
 
          end do
@@ -185,7 +185,7 @@ module ocn_adc_mixing
 
    adcMixing%length(1,:) = 0.55_RKIND
    adcMixing%length(nVertLevels+1,:) = 0.55_RKIND
- 
+
   end subroutine dissipation_lengths2
 
   subroutine build_dissipation_lengths(nCells,nVertLevels,BVF)
@@ -201,7 +201,7 @@ module ocn_adc_mixing
       integrandTop = 0.0
       integrandBot = 0.0
       do k=1,nvertLevels
-        KE = sqrt(0.5_RKIND*(adcMixing%u2(i2,k,iCell) + adcMixing%v2(i2,k,iCell) + adcMixing%w2(i2,k,iCell))) 
+        KE = sqrt(0.5_RKIND*(adcMixing%u2(i2,k,iCell) + adcMixing%v2(i2,k,iCell) + adcMixing%w2(i2,k,iCell)))
         integrandTop = integrandTop + 0.5_RKIND*KE*abs(adcMixing%ze(k,iCell)**2.0_RKIND - &
           adcMixing%ze(k+1,iCell)**2.0_RKIND)
         integrandBot = integrandBot + KE*(adcMixing%ze(k,iCell) - adcMixing%ze(k+1,iCell))
@@ -338,14 +338,14 @@ module ocn_adc_mixing
     do k = 2,nVertLevels
       dz = (adcMixing%zm(k-1,iCell) - adcMixing%zm(k,iCell))
       !need to add length scales for Up and Down
-      Tz = (activeTracers(1,k-1,iCell) - activeTracers(1,k,iCell)) / dz 
+      Tz = (activeTracers(1,k-1,iCell) - activeTracers(1,k,iCell)) / dz
       Sz = (activeTracers(2,k-1,iCell) - activeTracers(2,k,iCell)) / dz
       Uz = (uvel(k-1,iCell) - uvel(k,iCell)) / dz
       Vz = (vvel(k-1,iCell) - vvel(k,iCell)) / dz
 
       if(BVF(k,iCell) <= 0.0_RKIND) then
         adcMixing%lenspsU(k,iCell) = dz
-        adcMixing%lenspsD(k,iCell) = dz 
+        adcMixing%lenspsD(k,iCell) = dz
       else
         adcMixing%lenspsU(k,iCell) = min(dz,0.76_RKIND*sqrt(adcMixing%KspsU(k,iCell)/BVF(k,iCell)))
         adcMixing%lenspsD(k,iCell) = min(dz,0.76_RKIND*sqrt(adcMixing%KspsD(k,iCell)/BVF(k,iCell)))
@@ -370,7 +370,7 @@ module ocn_adc_mixing
     do k=2,nVertLevels
       adcMixing%eps(k,iCell) = (0.5_RKIND*(adcMixing%u2(i2,k,iCell) + adcMixing%v2(i2,k,iCell) + &
         adcMixing%w2(i2,k,iCell)))**1.5_RKIND/adcMixing%length(k,iCell)
-     
+
       dz = (adcMixing%zm(k-1,iCell) - adcMixing%zm(k,iCell))
       if(k==2) then
         Cval = 3.96
@@ -424,7 +424,7 @@ module ocn_adc_mixing
     real,intent(in) :: dt
     real,dimension(nVertLevels,nCells) :: taupt, taups, taupv
     real,dimension(nVertLevels+1,nCells) :: wttend, wstend, uwtend, vwtend, u2tend, v2tend, &
-      uttend, vttend, ustend, vstend
+      uttend, vttend, ustend, vstend, uvtend
     real :: B, Kps, Kpsp1, diff, lenav, Uz, Vz, Tz, Sz, sigav, sumdav
     real :: dz, dzmid, tumdav, Ksps
     integer :: iCell, k
@@ -441,7 +441,7 @@ module ocn_adc_mixing
         lenav = 0.5_RKIND*(adcMixing%length(k,iCell) + adcMixing%length(k+1,iCell))
         diff = adcMixing%C_mom * sqrt(0.5_RKIND*(Kps + Kpsp1)) / lenav
         dz = adcMixing%ze(k,iCell) - adcMixing%ze(k+1,iCell)
-        adcMixing%uw2(k,iCell) = -diff*(adcMixing%uw(i1,k,iCell) - adcMixing%uw(i1,k+1,iCell)) / dz 
+        adcMixing%uw2(k,iCell) = -diff*(adcMixing%uw(i1,k,iCell) - adcMixing%uw(i1,k+1,iCell)) / dz
         adcMixing%vw2(k,iCell) = -diff*(adcMixing%vw(i1,k,iCell) - adcMixing%vw(i1,k+1,iCell)) / dz
         adcMixing%u2w(k,iCell) = -diff*(adcMixing%u2(i1,k,iCell) - adcMixing%u2(i1,k+1,iCell)) / dz
         adcMixing%v2w(k,iCell) = -diff*(adcMixing%v2(i1,k,iCell) - adcMixing%v2(i1,k+1,iCell)) / dz
@@ -451,14 +451,14 @@ module ocn_adc_mixing
         adcMixing%uwt(k,iCell) = -diff*(adcMixing%ut(i1,k,iCell) - adcMixing%ut(i1,k+1,iCell)) / dz
         adcMixing%vwt(k,iCell) = -diff*(adcMixing%vt(i1,k,iCell) - adcMixing%vt(i1,k+1,iCell)) / dz
         adcMixing%uws(k,iCell) = -diff*(adcMixing%us(i1,k,iCell) - adcMixing%us(i1,k+1,iCell)) / dz
-        adcMixing%vws(k,iCell) = -diff*(adcMixing%vs(i1,k,iCell) - adcMixing%vs(i1,k+1,iCell)) / dz 
+        adcMixing%vws(k,iCell) = -diff*(adcMixing%vs(i1,k,iCell) - adcMixing%vs(i1,k+1,iCell)) / dz
       enddo
 
       do k=2,nVertLevels
         dz = adcMixing%ze(k,iCell) - adcMixing%ze(k+1,iCell)
         dzmid = adcMixing%zm(k-1,iCell) - adcMixing%zm(k,iCell)
         Uz = (uvel(k-1,iCell) - uvel(k,iCell)) / dz
-        Vz = (vvel(k-1,iCell) - vvel(k,iCell)) / dz 
+        Vz = (vvel(k-1,iCell) - vvel(k,iCell)) / dz
 
         Kps = sqrt((adcMixing%u2(i1,k,iCell) + adcMixing%v2(i1,k,iCell) + adcMixing%w2(i2,k,iCell)))
         B = adcMixing%grav*(alphaT(k,iCell)*adcMixing%wt(i1,k,iCell) - betaS(k,iCell)*adcMixing%ws(i1,k,iCell))
@@ -466,7 +466,7 @@ module ocn_adc_mixing
         taupt(k,iCell) = Kps / (sqrt(2.0)*adcMixing%c_pt*adcMixing%length(k,iCell))
         taups(k,iCell) = Kps / (sqrt(2.0)*adcMixing%c_ps*adcMixing%length(k,iCell))
 
-        !PDF formulation will allow for fairly easy generalization of vertical tracer fluxes to 
+        !PDF formulation will allow for fairly easy generalization of vertical tracer fluxes to
         !all tracers, write in tumd, sumd, wumd form, not sure how to do horizontal fluxes though
         adcMixing%wttend1(k,iCell) = -(adcMixing%w2t(k-1,iCell) - adcMixing%w2t(k,iCell)) / dzmid
         adcMixing%wttend2(k,iCell) = -adcMixing%w2(i1,k,iCell)*(activeTracers(1,k-1,iCell) &
@@ -487,7 +487,7 @@ module ocn_adc_mixing
         adcMixing%wstend3(k,iCell) = (1.0_RKIND - adcMixing%gamma1)*adcMixing%grav*(alphaT(k,iCell)* &
           adcMixing%ts(i2,k,iCell) - betaS(k,iCell)*adcMixing%s2(i2,k,iCell))
         adcMixing%wstend4(k,iCell) = -adcMixing%alpha3/4.0*(adcMixing%us(i1,k,iCell)*Uz + &
-          adcMixing%vs(i1,k,iCell)*Vz) 
+          adcMixing%vs(i1,k,iCell)*Vz)
         adcMixing%wsTend5(k,iCell) = adcMixing%kappa_FL*(adcMixing%ws(i1,k-1,iCell) -     &
           adcMixing%ws(i1,k+1,iCell)) / (adcMixing%ze(k-1,iCell) - adcMixing%ze(k+1,iCell))**2.0_RKIND
 
@@ -511,7 +511,7 @@ module ocn_adc_mixing
         uwtend(k,iCell) = adcMixing%uwtend1(k,iCell) + adcMixing%uwtend2(k,iCell) + &
           adcMixing%uwtend3(k,iCell) + adcMixing%uwtend4(k,iCell) + adcMixing%uwtend5(k,iCell)
 
-        vwtend(k,iCell) = (-(adcMixing%vw2(k-1,iCell) - adcMixing%vw2(k,iCell)) / dz +   & 
+        vwtend(k,iCell) = (-(adcMixing%vw2(k-1,iCell) - adcMixing%vw2(k,iCell)) / dz +   &
           0.5_RKIND*((0.8_RKIND-4.0_RKIND/3.0_RKIND*adcMixing%alpha1)*0.5_RKIND*Kps**2.0_RKIND +  &
           (adcMixing%alpha1 - adcMixing%alpha2)*adcMixing%v2(i1,k,iCell) + (adcMixing%alpha1 -   &
           adcMixing%alpha2 - 2.0_RKIND)*adcMixing%w2(i1,k,iCell))*Vz + 0.5_RKIND*(adcMixing%alpha1 &
@@ -520,18 +520,18 @@ module ocn_adc_mixing
           taupv(k,iCell)*adcMixing%vw(i1,k,iCell) + adcMixing%kappa_FL*(adcMixing%vw(i1,k-1,iCell) &
           - adcMixing%vw(i1,k+1,iCell)) / (adcMixing%ze(k-1,iCell) - adcMixing%ze(k+1,iCell))**2.0
 
-        uvtend(k,iCell) = (-(adcMixing%uvw(k-1,iCell) - adcMixing%uvw(k,iCell)) / dz + & 
+        uvtend(k,iCell) = (-(adcMixing%uvw(k-1,iCell) - adcMixing%uvw(k,iCell)) / dz + &
           (1.0_RKIND - 0.5_RKIND*(adcMixing%alpha1+adcMixing%alpha2))*(adcMixing%uw(i1,k,iCell)*Vz &
           + adcMixing%vw(i1,k,iCell)*Uz)) - taupv(k,iCell)*adcMixing%uv(i1,k,iCell) +           &
           adcMixing%kappa_VAR*(adcMixing%uv(i1,k-1,iCell) - adcMixing%uv(i1,k+1,iCell)) /       &
-          (adcMixing%ze(k-1,iCell) - adcMixing%ze(k+1,iCell))**2.0
+          (adcMixing%ze(k-1,iCell) - adcMixing%ze(k+1,iCell))**2.0_RKIND
 
         adcMixing%u2tend1(k,iCell) = -(adcMixing%u2w(k-1,iCell) - adcMixing%u2w(k,iCell)) / dz
         adcMixing%u2tend2(k,iCell) = (1.0_RKIND/3.0_RKIND*adcMixing%alpha1 + adcMixing%alpha2 - &
           2.0_RKIND)*adcMixing%uw(i1,k,iCell)*Uz
         adcMixing%u2tend3(k,iCell) = - 2.0_RKIND/3.0_RKIND*adcMixing%alpha1*adcMixing%vw(i1,k,iCell)*Vz
         adcMixing%u2tend4(k,iCell) = 2.0_RKIND/3.0_RKIND*(1.0_RKIND-adcMixing%beta5)*B
-        adcMixing%u2tend5(k,iCell) = -2.0_RKIND/3.0_RKIND*adcMixing%eps(k,iCell) + & 
+        adcMixing%u2tend5(k,iCell) = -2.0_RKIND/3.0_RKIND*adcMixing%eps(k,iCell) + &
           taupv(k,iCell)*(Kps**2.0_RKIND/3.0_RKIND - adcMixing%u2(i1,k,iCell))
 
         u2tend(k,iCell) = adcMixing%u2tend1(k,iCell) + adcMixing%u2tend2(k,iCell) + &
@@ -551,8 +551,8 @@ module ocn_adc_mixing
         !taupt = Kps / (2.0*adcMixing%c_pt*len(k,iCell))
         !taups = Kps / (2.0*adcMixing%c_ps*len(k,iCell))
 
-        Tz = (activeTracers(1,k-1,iCell) - activeTracers(1,k,iCell)) / dz 
-        Sz = (activeTracers(2,k-1,iCell) - activeTracers(2,k,iCell)) / dz 
+        Tz = (activeTracers(1,k-1,iCell) - activeTracers(1,k,iCell)) / dz
+        Sz = (activeTracers(2,k-1,iCell) - activeTracers(2,k,iCell)) / dz
 
         uttend(k,iCell) = (-(adcMixing%uwt(k-1,iCell) - adcMixing%uwt(k,iCell))/dz -  &
           adcMixing%uw(i1,k,iCell)*Tz - (1.0_RKIND - adcMixing%alpha3)*adcMixing%wt(i1,k,iCell) &
@@ -609,22 +609,22 @@ module ocn_adc_mixing
           (1.0_RKIND + dt*taups(k,iCell))
         if(abs(adcMixing%wt(i2,k,iCell)) > 1.0_RKIND) then
           call mpas_log_write("ERROR: wt out of range, wt = %r, location = $i, $i", &
-            realArgs=(/adcMixing%wt(i2,k,iCell)/),intArgs=(/k,iCell/),MPAS_LOG_CRIT)
+            MPAS_LOG_CRIT,realArgs=(/adcMixing%wt(i2,k,iCell)/),intArgs=(/k,iCell/))
         endif
 
         if(abs(adcMixing%ws(i2,k,iCell)) > 1.0_RKIND) then
           call mpas_log_write("ERROR: ws out of range, ws = %r, location = $i, $i", &
-            realArgs=(/adcMixing%ws(i2,k,iCell)/),intArgs=(/k,iCell/),MPAS_LOG_CRIT)
+            MPAS_LOG_CRIT,realArgs=(/adcMixing%ws(i2,k,iCell)/),intArgs=(/k,iCell/))
         endif
 
         if(abs(adcMixing%u2(i2,k,iCell)) > 1.0_RKIND) then
           call mpas_log_write("ERROR: u2 out of range, u2 = %r, location = $i, $i", &
-            realArgs=(/adcMixing%u2(i2,k,iCell)/),intArgs=(/k,iCell/),MPAS_LOG_CRIT)
+            MPAS_LOG_CRIT,realArgs=(/adcMixing%u2(i2,k,iCell)/),intArgs=(/k,iCell/))
         endif
 
         if(abs(adcMixing%v2(i2,k,iCell)) > 1.0_RKIND) then
           call mpas_log_write("ERROR: v2 out of range, v2 = %r, location = $i, $i", &
-            realArgs=(/adcMixing%v2(i2,k,iCell)/),intArgs=(/k,iCell/),MPAS_LOG_CRIT)
+            MPAS_LOG_CRIT,realArgs=(/adcMixing%v2(i2,k,iCell)/),intArgs=(/k,iCell/))
         endif
 
       enddo
@@ -633,16 +633,20 @@ module ocn_adc_mixing
 
   end subroutine diagnose_momentum_fluxes
 
-  subroutine predict_turbulent_quantities(nCells, nVertLevels, nTracers, dt, uvel, &
-            vvel,alphaT,betaS,adcMixing)
+  subroutine predict_turbulent_quantities(nCells, nVertLevels, nTracers,  &
+        dt, activeTracers, uvel,vvel,alphaT,betaS)
     integer,intent(in) :: nCells, nVertLevels, nTracers
     real,intent(in) :: dt
-    real,dimension(nCells),intent(in) :: alphaT, betaS
+    real,dimension(nTracers,nVertLevels,nCells),intent(in) :: activeTracers
+    real,dimension(nVertLevels,nCells),intent(in) :: alphaT, betaS
     real,dimension(nVertLevels,nCells) :: uvel, vvel
+
+    real,dimension(nVertLevels+1,nCells) :: w2tend
+    real,dimension(nVertLevels,nCells) :: w3tend
 
     real :: Sw, St, Ss, Eav, Dav, sigav, sigavp1, wumdAv, tumdAv, sumdAv, wumdAvp1, tumdAvp1, sumdAvp1
     real :: Swup, KspsUav, KspsDav, KspsUavp1, KspsDavp1, KE, Mcav, lenav,u2av,v2av,w2av
-    real :: w3temp, w3check, taups, taupt, mval, KEsps, Uz, Vz
+    real :: w3temp, w3check, taups, taupt, mval, KEsps, Uz, Vz, dz
 
     integer :: iCell, k
 
@@ -704,8 +708,8 @@ module ocn_adc_mixing
               adcMixing%w3tend4(k,iCell) + adcMixing%w3tend5(k,iCell)
 
         if(k>1 .and. k < nVertLevels) then
-           adcMixing%w3tend(k,iCell) = adcMixing%w3tend(k,iCell) + adcMixing%kappa_w3*(adcMixing%w3(i1,k-1,iCell) &
-              - adcMixing%w3(i1,k+1,iCell)) / (adcMixing%zm(k-1,iCell) - adcMixing%zmid(k+1,iCell))**2.0
+           w3tend(k,iCell) = w3tend(k,iCell) + adcMixing%kappa_w3*(adcMixing%w3(i1,k-1,iCell) &
+              - adcMixing%w3(i1,k+1,iCell)) / (adcMixing%zm(k-1,iCell) - adcMixing%zm(k+1,iCell))**2.0
         endif
 
       enddo
@@ -719,9 +723,9 @@ module ocn_adc_mixing
 !      enddo
 
       do k=2,nVertLevels-1
-        dz = (zmid(k-1,iCell) - zmid(k,iCell))
+        dz = (adcMixing%zm(k-1,iCell) - adcMixing%zm(k,iCell))
 
-        sigav = 0.5*(adcMixing%areaFraction(k,iCell) + adcMixingareaFraction(k-1,iCell))
+        sigav = 0.5*(adcMixing%areaFraction(k,iCell) + adcMixing%areaFraction(k-1,iCell))
         wumdav = 0.5*(adcMixing%wumd(k,iCell) + adcMixing%wumd(k-1,iCell))
         tumdav = 0.5*(adcMixing%tumd(k,iCell) + adcMixing%tumd(k-1,iCell))
         sumdav = 0.5*(adcMixing%sumd(k,iCell) + adcMixing%sumd(k-1,iCell))
@@ -734,7 +738,7 @@ module ocn_adc_mixing
         KspsDavp1 = 0.5*(adcMixing%KspsD(k,iCell) + adcMixing%KspsD(k+1,iCell))
 
         Uz = (uvel(k-1,iCell) - uvel(k,iCell)) / dz
-        Vz = (vvel(k-1,iCell) - vvel(k,iCell)) / dz 
+        Vz = (vvel(k-1,iCell) - vvel(k,iCell)) / dz
 
         KEsps = adcMixing%areaFraction(k,iCell)*adcMixing%KspsU(k,iCell) +  &
                   (1.0_RKIND-adcMixing%areaFraction(k,iCell))*adcMixing%KspsD(k,iCell)
@@ -743,7 +747,7 @@ module ocn_adc_mixing
           betaS(k,iCell)*adcMixing%sumd(k,iCell) - 2.0_RKIND/3.0_RKIND*(1.0_RKIND/        &
           adcMixing%areaFraction(k,iCell)*(sigAv*KspsUav - sigavp1*KspsUavp1) / dz -     &
           1.0_RKIND/(1.0_RKIND - adcMixing%areaFraction(k,iCell))*((1.0_RKIND - sigav)* &
-          KspsDav - (1.0 - sigavp1)*KspsDavp1) / dz) 
+          KspsDav - (1.0 - sigavp1)*KspsDavp1) / dz)
 
         adcMixing%w2tend1(k,iCell) = -adcMixing%wumd(k,iCell)**2.0_RKIND*(         &
           adcMixing%Entrainment(k,iCell) + adcMixing%Detrainment(k,iCell))
@@ -756,15 +760,16 @@ module ocn_adc_mixing
           alphaT(k,iCell)*adcMixing%tumd(k,iCell) - adcMixing%grav*betaS(k,iCell)*      &
           adcMixing%sumd(k,iCell))
         adcMixing%w2tend5(k,iCell) = (1.0_RKIND/3.0_RKIND*adcMixing%alpha1 -            &
-          adcMixing%alpha2)*(adcMixing%uw(i1,k,iCell)*Uz + adcMixing%vw(i1,k,iCell)*Vz) 
+          adcMixing%alpha2)*(adcMixing%uw(i1,k,iCell)*Uz + adcMixing%vw(i1,k,iCell)*Vz)
 
-        adcMixing%w2tend(k,iCell) = adcMixing%w2tend1(k,iCell) + adcMixing%w2tend2(k,iCell) + &
+        w2tend(k,iCell) = adcMixing%w2tend1(k,iCell) + adcMixing%w2tend2(k,iCell) + &
           adcMixing%w2tend3(k,iCell) + adcMixing%w2tend4(k,iCell) + adcMixing%w2tend5(k,iCell)
     enddo
+  end do
 
     do iCell=1,nCells
       do k=2,nVertLevels
-        adcMixing%w2(i2,k,iCell) = adcMixing%w2(i1,k,iCell) + dt*adcMixing%w2tend(k,iCell)
+        adcMixing%w2(i2,k,iCell) = adcMixing%w2(i1,k,iCell) + dt*w2tend(k,iCell)
         if(adcMixing%w2(i2,k,iCell) < 0.0_RKIND) then
           adcMixing%w2cliptend(k,iCell) = -adcMixing%w2(i2,k,iCell)
           adcMixing%w2(i2,k,iCell) = 0.0_RKIND
@@ -772,17 +777,17 @@ module ocn_adc_mixing
 
         if(abs(adcMixing%w2(i2,k,iCell)) > 1.0_RKIND) then
           call mpas_log_write("ERROR: w2 out of range, w2 = %r, location = $i, $i", &
-            realArgs=(/adcMixing%w2(i2,k,iCell)/),intArgs=(/k,iCell/),MPAS_LOG_CRIT)
+            MPAS_LOG_CRIT,realArgs=(/adcMixing%w2(i2,k,iCell)/),intArgs=(/k,iCell/))
         endif
       end do
 
       do k=1,nVertLevels
         w3check = (adcMixing%w2(i2,k,iCell) + adcMixing%w2(i2,k+1,iCell))**1.5
-        adcMixing%w3(i2,k,iCell) = min(adcMixing%w3(i1,k,iCell) + dt*adcMixing%w3tend(k,iCell),w3check)
-        
+        adcMixing%w3(i2,k,iCell) = min(adcMixing%w3(i1,k,iCell) + dt*w3tend(k,iCell),w3check)
+
         if(abs(adcMixing%w3(i2,k,iCell)) > 1.0_RKIND) then
           call mpas_log_write("ERROR: w3 out of range, w2 = %r, location = $i, $i", &
-            realArgs=(/adcMixing%w3(i2,k,iCell)/),intArgs=(/k,iCell/),MPAS_LOG_CRIT)
+            MPAS_LOG_CRIT,realArgs=(/adcMixing%w3(i2,k,iCell)/),intArgs=(/k,iCell/))
         endif
       enddo
     enddo
@@ -826,8 +831,8 @@ module ocn_adc_mixing
     real,intent(in) :: dt
 
     real,dimension(nTracers,nVertLevels,nCells),intent(inout) :: activeTracers
-    real,dimension(nVertLevels,nCells),intent(inout) :: uvel, vvel
-    real,dimension(nCells),intent(in) :: uwsfc, vwsfc, wtsfc, wssfc, alphaT, betaS, fCell
+    real,dimension(nVertLevels,nCells),intent(inout) :: uvel, vvel, alphaT, betaS
+    real,dimension(nCells),intent(in) :: uwsfc, vwsfc, wtsfc, wssfc, fCell
     real,dimension(nVertLevels+1,nCells),intent(inout) :: BVF
     integer :: niter, iIter,iCell,k
 
@@ -842,16 +847,16 @@ module ocn_adc_mixing
     do iIter=1,niter
       call build_diagnostic_arrays(nCells,nVertLevels,BVF,wtsfc,wssfc,  &
         uwsfc,vwsfc,alphaT,betaS)
-      call predict_turbulent_quantities(nCells, nVertLevels, dt_small, activeTracers, uvel, vvel,  &
-        alphaT, betaS)
-      call diagnose_momentum_fluxes(nCells,nVertLevels,activeTracers,uvel,vvel,alphaT,betaS,dt_small)
+      call predict_turbulent_quantities(nCells, nVertLevels, nTracers, dt_small, &
+        activeTracers, uvel, vvel, alphaT, betaS)
+      call diagnose_momentum_fluxes(nCells,nVertLevels,nTracers,activeTracers,uvel,vvel,alphaT,betaS,dt_small)
       call build_areaFraction_updraft_properties(nCells, nVertLevels)
       call calc_scalar_updraft_properties(nCells, nVertLevels,wtsfc, wssfc, &
                                 alphaT, betaS, i2)
       call calc_subplume_fluxes(nCells,nVertLevels,activeTracers,uvel,vvel, BVF,alphaT,betaS,dt_small)
 !      call build_dissipation_lengths(nCells,nVertLevels,BVF)
       call dissipation_lengths2(nCells,nVertLevels,activeTracers,alphaT,betaS)
-      call update_mean_fields(dt_small,nCells,nVertLevels,uvel,vvel,activeTracers,fCell)
+      call update_mean_fields(dt_small,nCells,nVertLevels, 2, uvel,vvel,activeTracers,fCell)
       call swap_time_levels
     enddo
   end subroutine ADC_main_loop
