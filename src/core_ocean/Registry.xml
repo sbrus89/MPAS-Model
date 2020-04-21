@@ -2499,12 +2499,10 @@
 		<var name="inSituThermalExpansionCoeff"
 			 type="real" dimensions="nVertLevels nCells Time" units="C^{-1}"
 			 description="Thermal expansion coefficient (alpha), defined as $-1/\rho d\rho/dT$ (note negative sign).  This is in situ, i.e. not displaced to another depth."
-			 packages="inSituEOS"
 		/>
 		<var name="inSituSalineContractionCoeff"
 			 type="real" dimensions="nVertLevels nCells Time" units="PSU^{-1}"
 			 description="Saline contraction coefficient (beta), defined as $1/\rho d\rho/dS$.  This is also called the haline contraction coefficient.  This is in situ, i.e. not displaced to another depth."
-			 packages="inSituEOS"
 		/>
 
 		<var name="BruntVaisalaFreqTop" type="real" dimensions="nVertLevels nCells Time" units="s^{-2}"

@@ -10,8 +10,6 @@ module ocn_adc_mixing
 
   logical :: defineFirst, stopflag
 
-  real,allocatable,dimension(:) :: boundaryLayerDepth
-
   integer :: i1,i2
 
 !  integer,parameter :: ntimes = 2
@@ -35,11 +33,12 @@ module ocn_adc_mixing
   end subroutine swap_time_levels
 
   subroutine build_diagnostic_arrays(nCells,nVertLevels,BVF,wtsfc,wssfc, &
-        uwsfc, vwsfc, alphaT,betaS)
+        uwsfc, vwsfc, alphaT,betaS, boundaryLayerDepth)
   !construct dTdz, dSdz, dbdz
     integer,intent(in) :: nCells, nVertLevels
     real,dimension(nCells),intent(in) :: wtsfc, wssfc, uwsfc, vwsfc
-    real,dimension(nVertLevels,nCells),intent(out) :: BVF, alphaT, betaS
+    real,dimension(nCells),intent(inout) :: boundaryLayerDepth
+    real,dimension(nVertLevels,nCells),intent(in) :: BVF, alphaT, betaS
     integer :: iCell, k, idx
     real,dimension(nCells) :: wstar
     logical :: first
@@ -62,7 +61,16 @@ module ocn_adc_mixing
       enddo
 
       boundaryLayerDepth(iCell) = abs(adcMixing%ze(idx,iCell))
-      Q = adcMixing%grav*(alphaT(k,iCell)*wtsfc(iCell) - betaS(k,iCell)*wssfc(iCell))* &
+      print *, boundaryLayerDepth(iCell)
+      print *, adcMixing%grav
+      print *, 'bs = ',shape(betaS)
+      print *, iCell
+      print *, alphaT(1,iCell)
+      print *, wtsfc(iCell)
+      print *, maxval(betaS),minval(betaS)
+      print *, wssfc(iCell)
+     ! stop
+      Q = adcMixing%grav*(alphaT(1,iCell)*wtsfc(iCell) - betaS(1,iCell)*wssfc(iCell))* &
         boundaryLayerDepth(iCell)
       if(Q > 0) then
         wstar(iCell) = abs(Q)**(1.0/3.0)
@@ -258,10 +266,11 @@ module ocn_adc_mixing
 
   end subroutine build_areaFraction_updraft_properties
 
-  subroutine calc_scalar_updraft_properties(nCells,nVertLevels,wtsfc, wssfc, alphaT, betaS, tlev)
+  subroutine calc_scalar_updraft_properties(nCells,nVertLevels,wtsfc, wssfc, alphaT,  &
+    betaS, boundaryLayerDepth, tlev)
 
     integer,intent(in) :: nCells, nVertLevels, tlev
-    real,dimension(nCells),intent(in) :: wtsfc, wssfc
+    real,dimension(nCells),intent(in) :: wtsfc, wssfc, boundaryLayerDepth
     real, dimension(nVertLevels,nCells) :: alphaT, betaS
 
     real :: wtav, McAv, sigav, tumdav, wumdav, sumdav, wb, bld, wstar
@@ -825,7 +834,7 @@ module ocn_adc_mixing
   end subroutine update_mean_fields
 
   subroutine ADC_main_loop(nCells,nVertLevels, nTracers, dt,activeTracers, uvel, vvel, BVF,  &
-      uwsfc, vwsfc, wtsfc, wssfc, alphaT, betaS, fCell)
+      uwsfc, vwsfc, wtsfc, wssfc, alphaT, betaS, fCell, boundaryLayerDepth)
 
     integer,intent(in) :: nCells, nVertLevels, nTracers
     real,intent(in) :: dt
@@ -833,6 +842,7 @@ module ocn_adc_mixing
     real,dimension(nTracers,nVertLevels,nCells),intent(inout) :: activeTracers
     real,dimension(nVertLevels,nCells),intent(inout) :: uvel, vvel, alphaT, betaS
     real,dimension(nCells),intent(in) :: uwsfc, vwsfc, wtsfc, wssfc, fCell
+    real,dimension(nCells),intent(inout) :: boundaryLayerDepth
     real,dimension(nVertLevels+1,nCells),intent(inout) :: BVF
     integer :: niter, iIter,iCell,k
 
@@ -846,13 +856,13 @@ module ocn_adc_mixing
 !    call construct_depth_coordinate(ssh,layerThick,nCells,nVertLevels)
     do iIter=1,niter
       call build_diagnostic_arrays(nCells,nVertLevels,BVF,wtsfc,wssfc,  &
-        uwsfc,vwsfc,alphaT,betaS)
+        uwsfc,vwsfc,alphaT,betaS,boundaryLayerDepth)
       call predict_turbulent_quantities(nCells, nVertLevels, nTracers, dt_small, &
         activeTracers, uvel, vvel, alphaT, betaS)
       call diagnose_momentum_fluxes(nCells,nVertLevels,nTracers,activeTracers,uvel,vvel,alphaT,betaS,dt_small)
       call build_areaFraction_updraft_properties(nCells, nVertLevels)
       call calc_scalar_updraft_properties(nCells, nVertLevels,wtsfc, wssfc, &
-                                alphaT, betaS, i2)
+                                alphaT, betaS, boundaryLayerDepth, i2)
       call calc_subplume_fluxes(nCells,nVertLevels,activeTracers,uvel,vvel, BVF,alphaT,betaS,dt_small)
 !      call build_dissipation_lengths(nCells,nVertLevels,BVF)
       call dissipation_lengths2(nCells,nVertLevels,activeTracers,alphaT,betaS)

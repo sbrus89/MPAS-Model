@@ -132,13 +132,13 @@ contains
         stressX, stressY, stressZ, stressZonal, stressMeridional, fCell, &
         surfaceStress, surfaceStressMagnitude, bottomDepth,  &
         penetrativeTemperatureFlux, angleEdge, surfaceThicknessFlux, &
-        surfaceThicknessFluxRunoff
+        surfaceThicknessFluxRunoff, boundaryLayerDepth
 
       real (kind=RKIND), dimension(:,:), pointer :: &
         layerThickness, velocityZonal, velocityMeridional, &
         tracerGroupSurfaceFlux, tracerGroupSurfaceFluxRunoff, &
         tracerGroupSurfaceFluxRemoved, BruntVaisalaFreqTop,  &
-        inSituThermalExpansionCoeff, inSituSalinityContractionCoeff
+        inSituThermalExpansionCoeff, inSituSalineContractionCoeff
 
       real (kind=RKIND), dimension(:,:,:), pointer :: activeTracers
       integer, pointer :: indexTemperature, indexSalinity
@@ -181,6 +181,8 @@ contains
       call mpas_pool_get_dimension(meshPool, 'nVertLevels', nVertLevels)
       call mpas_pool_get_dimension(meshPool, 'nVertLevelsP1', nVertLevelsP1)
       call mpas_pool_get_dimension(meshPool, 'nCellsArray', nCellsArray)
+      call mpas_pool_get_dimension(meshPool, 'nEdgesArray', nEdgesArray)
+
       call mpas_pool_get_array(meshPool, 'nEdgesOnCell', nEdgesOnCell)
       !
       ! set pointers for fields related to position on sphere
@@ -198,8 +200,9 @@ contains
       call mpas_pool_get_array(forcingPool, "surfaceThicknessFlux", surfaceThicknessFlux)
       call mpas_pool_get_array(forcingPool, "surfaceThicknessFluxRunoff", surfaceThicknessFluxRunoff)
 
+      call mpas_pool_get_array(diagnosticsPool, "boundaryLayerDepth", boundaryLayerDepth)
       call mpas_pool_get_array(diagnosticsPool, 'inSituThermalExpansionCoeff', inSituThermalExpansionCoeff)
-      call mpas_pool_get_array(diagnosticsPool, 'inSituSalinityContractionCoeff', inSituSalinityContractionCoeff)
+      call mpas_pool_get_array(diagnosticsPool, 'inSituSalineContractionCoeff', inSituSalineContractionCoeff)
       call mpas_pool_get_array(diagnosticsPool, 'BruntVaisalaFreqTop', BruntVaisalaFreqTop)
       call mpas_pool_get_array(diagnosticsPool, 'velocityZonal', velocityZonal)
       call mpas_pool_get_array(diagnosticsPool, 'velocityMeridional', velocityMeridional)
@@ -311,9 +314,11 @@ contains
      !call the individual ADC function and pass the array members maybe?  probably not
      !this will update T in place, so verify it sends time level n+1
      ntracers = size(activeTracers, dim=1)
+     print *, maxval(inSituSalineContractionCoeff),minval(inSituSalineContractionCoeff)
+
      call ADC_main_loop(nCells, nVertLevels, ntracers, dt, activeTracers, velocityZonal, velocityMeridional, &
           BruntVaisalaFreqTop, uw_sfc, vw_sfc, wt_sfc, ws_sfc, inSituThermalExpansionCoeff,        &
-          inSituSalinityContractionCoeff, fCell)
+          inSituSalineContractionCoeff, fCell, boundaryLayerDepth)
 
          !--------------------------------------------------------------------
 

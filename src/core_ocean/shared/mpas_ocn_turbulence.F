@@ -17,7 +17,7 @@
 !!  \date   14 Jan 2020
 !!  \details
 !!  This module creates and maintains a primary ocean mesh structure
-!!  for the ADC mixing scheme.  Eventually it will send arrays over to GPU 
+!!  for the ADC mixing scheme.  Eventually it will send arrays over to GPU
 !!  but for now just loads on to cpu
 !
 !-------------------------------------------------------------------------------
@@ -204,6 +204,7 @@ module ocn_turbulence
       call mpas_pool_get_array(adcDiagnosticsPool, 'tumd', tumdTmp)
       call mpas_pool_get_array(adcDiagnosticsPool, 'sumd', sumdTmp)
       call mpas_pool_get_array(adcDiagnosticsPool, 'wumd', wumdTmp)
+      call mpas_pool_get_array(adcDiagnosticsPool, 'Mc', McTmp)
 
       allocate( adcMixing%KspsD( nVertLevelsP1, nCells ), adcMixing%KspsU( nVertLevelsP1, nCells) )
       allocate( adcMixing%ze( nVertLevelsP1, nCells ), adcMixing%zm( nVertLevels, nCells ))
@@ -224,9 +225,9 @@ module ocn_turbulence
       allocate( adcMixing%areaFraction( nVertLevelsP1, nCells ))
       allocate( adcMixing%Entrainment( nVertLevelsP1, nCells ), adcMixing%Detrainment( nVertLevelsP1, nCells ))
       allocate( adcMixing%tumd( nVertLevelsP1, nCells ), adcMixing%sumd( nVertLevelsP1, nCells ))
-      allocate( adcMixing%wumd( nVertLevelsP1, nCells ))
+      allocate( adcMixing%wumd( nVertLevelsP1, nCells ), adcMixing%Mc( nVertLevelsP1, nCells ))
 
-      adcMixing%KspsD(:,:) = KspsDTmp(:,:)
+      adcMixing%KspsD = KspsDTmp
       adcMixing%KspsU = KspsUTmp
       adcMixing%ze = zeTmp
       adcMixing%zm = zmTmp
@@ -431,22 +432,22 @@ module ocn_turbulence
       allocate( adcMixing%ts( 2, nVertLevelsP1, nCells ) )
       allocate( adcMixing%s2( 2, nVertLevelsP1, nCells ) )
 
-      adcMixing%u2(1,:,:) = u2Tmp
-      adcMixing%v2(1,:,:) = v2Tmp
-      adcMixing%w2(1,:,:) = w2Tmp
-      adcMixing%wt(1,:,:) = wtTmp
-      adcMixing%ws(1,:,:) = wsTmp
-      adcMixing%uw(1,:,:) = uwTmp
-      adcMixing%vw(1,:,:) = vwTmp
-      adcMixing%w3(1,:,:) = w3Tmp
-      adcMixing%uv(1,:,:) = uvTmp
-      adcMixing%t2(1,:,:) = t2Tmp
-      adcMixing%ut(1,:,:) = utTmp
-      adcMixing%vt(1,:,:) = vtTmp
-      adcMixing%us(1,:,:) = usTmp
-      adcMixing%vs(1,:,:) = vsTmp
-      adcMixing%ts(1,:,:) = tsTmp
-      adcMixing%s2(1,:,:) = s2Tmp
+      adcMixing%u2(1,:,:) = u2Tmp(:,:nCells)
+      adcMixing%v2(1,:,:) = v2Tmp(:,:nCells)
+      adcMixing%w2(1,:,:) = w2Tmp(:,:nCells)
+      adcMixing%wt(1,:,:) = wtTmp(:,:nCells)
+      adcMixing%ws(1,:,:) = wsTmp(:,:nCells)
+      adcMixing%uw(1,:,:) = uwTmp(:,:nCells)
+      adcMixing%vw(1,:,:) = vwTmp(:,:nCells)
+      adcMixing%w3(1,:,:) = w3Tmp(:,:nCells)
+      adcMixing%uv(1,:,:) = uvTmp(:,:nCells)
+      adcMixing%t2(1,:,:) = t2Tmp(:,:nCells)
+      adcMixing%ut(1,:,:) = utTmp(:,:nCells)
+      adcMixing%vt(1,:,:) = vtTmp(:,:nCells)
+      adcMixing%us(1,:,:) = usTmp(:,:nCells)
+      adcMixing%vs(1,:,:) = vsTmp(:,:nCells)
+      adcMixing%ts(1,:,:) = tsTmp(:,:nCells)
+      adcMixing%s2(1,:,:) = s2Tmp(:,:nCells)
 
       call mpas_pool_get_array(adcPrognosticsPool, 'u2', u2Tmp, 2)
       call mpas_pool_get_array(adcPrognosticsPool, 'v2', v2Tmp, 2)
@@ -465,22 +466,22 @@ module ocn_turbulence
       call mpas_pool_get_array(adcPrognosticsPool, 'ts', tsTmp, 2)
       call mpas_pool_get_array(adcPrognosticsPool, 's2', s2Tmp, 2)
 
-      adcMixing%u2(2,:,:) = u2Tmp
-      adcMixing%v2(2,:,:) = v2Tmp
-      adcMixing%w2(2,:,:) = w2Tmp
-      adcMixing%wt(2,:,:) = wtTmp
-      adcMixing%ws(2,:,:) = wsTmp
-      adcMixing%uw(2,:,:) = uwTmp
-      adcMixing%vw(2,:,:) = vwTmp
-      adcMixing%w3(2,:,:) = w3Tmp
-      adcMixing%uv(2,:,:) = uvTmp
-      adcMixing%t2(2,:,:) = t2Tmp
-      adcMixing%ut(2,:,:) = utTmp
-      adcMixing%vt(2,:,:) = vtTmp
-      adcMixing%us(2,:,:) = usTmp
-      adcMixing%vs(2,:,:) = vsTmp
-      adcMixing%ts(2,:,:) = tsTmp
-      adcMixing%s2(2,:,:) = s2Tmp
+      adcMixing%u2(2,:,:) = u2Tmp(:,:nCells)
+      adcMixing%v2(2,:,:) = v2Tmp(:,:nCells)
+      adcMixing%w2(2,:,:) = w2Tmp(:,:nCells)
+      adcMixing%wt(2,:,:) = wtTmp(:,:nCells)
+      adcMixing%ws(2,:,:) = wsTmp(:,:nCells)
+      adcMixing%uw(2,:,:) = uwTmp(:,:nCells)
+      adcMixing%vw(2,:,:) = vwTmp(:,:nCells)
+      adcMixing%w3(2,:,:) = w3Tmp(:,:nCells)
+      adcMixing%uv(2,:,:) = uvTmp(:,:nCells)
+      adcMixing%t2(2,:,:) = t2Tmp(:,:nCells)
+      adcMixing%ut(2,:,:) = utTmp(:,:nCells)
+      adcMixing%vt(2,:,:) = vtTmp(:,:nCells)
+      adcMixing%us(2,:,:) = usTmp(:,:nCells)
+      adcMixing%vs(2,:,:) = vsTmp(:,:nCells)
+      adcMixing%ts(2,:,:) = tsTmp(:,:nCells)
+      adcMixing%s2(2,:,:) = s2Tmp(:,:nCells)
       block => block % next
    end do
 !   at end could do a copy to accelerator

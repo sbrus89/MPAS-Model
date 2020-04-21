@@ -605,13 +605,15 @@ contains
       !
 
       ! Only need densities on 0, 1, and 2 halo cells
-      nCells = nCellsArray( 3 )
+      nCells = nCellsArray( size(nCellsArray) )
+
+      call mpas_pool_get_array(diagnosticsPool, 'inSituThermalExpansionCoeff',inSituThermalExpansionCoeff)
+      call mpas_pool_get_array(diagnosticsPool, 'inSituSalineContractionCoeff', inSituSalineContractionCoeff)
 
       ! compute in-place density
       if (config_pressure_gradient_type.eq.'Jacobian_from_TS') then
          ! only compute EOS derivatives if needed.
-         call mpas_pool_get_array(diagnosticsPool, 'inSituThermalExpansionCoeff',inSituThermalExpansionCoeff)
-         call mpas_pool_get_array(diagnosticsPool, 'inSituSalineContractionCoeff', inSituSalineContractionCoeff)
+
          call ocn_equation_of_state_density(statePool, diagnosticsPool, meshPool, scratchPool, &
                                             nCells, 0, 'relative', density, err, &
                                             inSituThermalExpansionCoeff, inSituSalineContractionCoeff, &
@@ -619,6 +621,7 @@ contains
       else
          call ocn_equation_of_state_density(statePool, diagnosticsPool, meshPool, scratchPool, &
                                             nCells, 0, 'relative', density, err, &
+                                            inSituThermalExpansionCoeff, inSituSalineContractionCoeff, &
                                             timeLevelIn=timeLevel)
       endif
       call mpas_threading_barrier()
