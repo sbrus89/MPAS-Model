@@ -60,17 +60,8 @@ module ocn_adc_mixing
         endif
       enddo
 
-      boundaryLayerDepth(iCell) = abs(adcMixing%ze(idx,iCell))
-      print *, boundaryLayerDepth(iCell)
-      print *, adcMixing%grav
-      print *, 'bs = ',shape(betaS)
-      print *, iCell
-      print *, alphaT(1,iCell)
-      print *, wtsfc(iCell)
-      print *, maxval(betaS),minval(betaS)
-      print *, wssfc(iCell)
-     ! stop
-      Q = adcMixing%grav*(alphaT(1,iCell)*wtsfc(iCell) - betaS(1,iCell)*wssfc(iCell))* &
+      boundaryLayerDepth(iCell) = abs(ze(idx,iCell))
+      Q = grav*(alphaT(1,iCell)*wtsfc(iCell) - betaS(1,iCell)*wssfc(iCell))* &
         boundaryLayerDepth(iCell)
       if(Q > 0) then
         wstar(iCell) = abs(Q)**(1.0/3.0)
@@ -78,12 +69,12 @@ module ocn_adc_mixing
         wstar(iCell) = 0.0
       endif
 
-      adcMixing%u2(:,1,iCell) = 4.0*uwsfc(iCell) + 0.3*wstar(iCell)**2.0
-      adcMixing%v2(:,1,iCell) =4.*uwsfc(iCell) + 0.3*wstar(iCell)**2.0
-      adcMixing%uw(:,1,iCell) = -uwsfc(iCell)
-      adcMixing%vw(:,1,iCell) = vwsfc(iCell)
-      adcMixing%wt(:,1,iCell) = wtsfc(iCell)
-      adcMixing%ws(:,1,iCell) = wssfc(iCell)
+      u2(:,1,iCell) = 4.0*uwsfc(iCell) + 0.3*wstar(iCell)**2.0
+      v2(:,1,iCell) =4.*uwsfc(iCell) + 0.3*wstar(iCell)**2.0
+      uw(:,1,iCell) = -uwsfc(iCell)
+      vw(:,1,iCell) = vwsfc(iCell)
+      wt(:,1,iCell) = wtsfc(iCell)
+      ws(:,1,iCell) = wssfc(iCell)
     enddo
 
   end subroutine build_diagnostic_arrays
@@ -102,14 +93,14 @@ module ocn_adc_mixing
     !NOTE: will need to convert to some form of displaced density in the mpas framework soon
     !possibly go back to a more traditional length scale formulation
     do i=1,nCells
-       tke(:) = 0.5*(adcMixing%u2(i2,:,i) + adcMixing%v2(i2,:,i) + adcMixing%w2(i2,:,i))
+       tke(:) = 0.5*(u2(i2,:,i) + v2(i2,:,i) + w2(i2,:,i))
        do k=1,nVertLevels
           B(k) = -9.806*(-alphaT(k,i)*(activeTracers(1,k,i) - 15.0_RKIND) + betaS(k,i)*   &
                     (activeTracers(2,k,i) - 35.0_RKIND))
 
-          sav = 0.5_RKIND*(adcMixing%areaFraction(k,i) + adcMixing%areaFraction(k+1,i))
-          tudav = 0.5_RKIND*(adcMixing%tumd(k,i) + adcMixing%tumd(k+1,i))
-          sudav = 0.5*(adcMixing%sumd(k,i) + adcMixing%sumd(k+1,i))
+          sav = 0.5_RKIND*(areaFraction(k,i) + areaFraction(k+1,i))
+          tudav = 0.5_RKIND*(tumd(k,i) + tumd(k+1,i))
+          sudav = 0.5*(sumd(k,i) + sumd(k+1,i))
 
           Tup = activeTracers(1,k,i) + (1.0_RKIND - sav)*tudav
           Tdo = activeTracers(1,k,i) - sav*tudav
@@ -127,7 +118,7 @@ module ocn_adc_mixing
 
        BdoEdge(nVertLevels+1) = BdoEdge(nVertLevels)
        BupEdge(nVertLevels+1) = BupEdge(nVertLevels)
-
+ 
        BdoEdge(1) = BdoEdge(2)
        BupEdge(1) = BupEdge(2)
 
@@ -135,24 +126,24 @@ module ocn_adc_mixing
 
           sumv = 0
           ij=k
-          adcMixing%lenup(k,i) = 0.0_RKIND
+          lenup(k,i) = 0.0_RKIND
           do while(sumv <= tke(k) .and. ij < nVertLevels+1)
-             sumv = sumv + (BupEdge(k) - Bup(ij))*(adcMixing%ze(ij,i)-adcMixing%ze(ij+1,i))**2.0_RKIND/2.0_RKIND
-             adcMixing%lenup(k,i) =  adcMixing%lenup(k,i) + abs(adcMixing%ze(ij,i)-adcMixing%ze(ij+1,i))
+             sumv = sumv + abs(BupEdge(k) - Bup(ij))*(ze(ij,i)-ze(ij+1,i))**2.0_RKIND/2.0_RKIND
+             lenup(k,i) =  lenup(k,i) + abs(ze(ij,i)-ze(ij+1,i))
              ij = ij + 1
 
              if(sumv > tke(k)) THEN
                 ij = ij - 1
-                sumv = sumv - (BupEdge(k) - Bup(ij))*(adcMixing%ze(ij,i)-adcMixing%ze(ij+1,i))**2.0/2.0
-                adcMixing%lenup(k,i) = adcMixing%lenup(k,i) - abs(adcMixing%ze(ij,i)-adcMixing%ze(ij+1,i))
+                sumv = sumv - abs(BupEdge(k) - Bup(ij))*(ze(ij,i)-ze(ij+1,i))**2.0/2.0
+                lenup(k,i) = lenup(k,i) - abs(ze(ij,i)-ze(ij+1,i))
 !                lenup(k,i) = max(0.55,lenup(k,i) + abs((z1-zV)/(s1 - sumv)*(tke(k)-sumv)))
                 if(Bup(k-1) - Bup(k) < 0) then
-                        minlen = abs(adcMixing%zm(k-1,i) - adcMixing%zm(k,i))
+                        minlen = abs(zm(k-1,i) - zm(k,i))
                 else
                         minlen = 0.5_RKIND
                 endif
-                adcMixing%lenup(k,i) = max(minlen, adcMixing%lenup(k,i) + sqrt(2.0_RKIND/(BupEdge(k) -         &
-                                Bup(ij-1))*(tke(k) - sumv)))
+                lenup(k,i) = max(minlen, lenup(k,i) + sqrt(2.0_RKIND/(1.0E-15 + abs(BupEdge(k) -         &
+                                Bup(ij-1))*(tke(k) - sumv))))
                 exit
              endif
 
@@ -161,10 +152,10 @@ module ocn_adc_mixing
         !find lendown
         sumv = 0
         ij=k
-        adcMixing%lendn(k,i) = 0.0_RKIND
+        lendn(k,i) = 0.0_RKIND
         do while(sumv <= tke(k) .and. ij>1)
-           sumv = sumv - (BdoEdge(k) - Bdo(ij-1))*(adcMixing%ze(ij-1,i)-adcMixing%ze(ij,i))**2.0_RKIND/2.0_RKIND
-           adcMixing%lendn(k,i) = adcMixing%lendn(k,i) + abs(adcMixing%ze(ij-1,i)-adcMixing%ze(ij,i))
+           sumv = sumv - (BdoEdge(k) - Bdo(ij-1))*(ze(ij-1,i)-ze(ij,i))**2.0_RKIND/2.0_RKIND
+           lendn(k,i) = lendn(k,i) + abs(ze(ij-1,i)-ze(ij,i))
            ij = ij - 1
 
            if(sumv > tke(k)) THEN
@@ -172,27 +163,27 @@ module ocn_adc_mixing
 !              s1 = sumv
 !              z1 = zedge(ij,i)
 !              zV = zedge(ij-1,i)
-              sumv = sumv + (BdoEdge(k) - Bdo(ij-1))*(adcMixing%ze(ij-1,i)-adcMixing%ze(ij,i))**2.0_RKIND/2.0_RKIND
-              adcMixing%lendn(k,i) = adcMixing%lendn(k,i) - abs(adcMixing%ze(ij-1,i)-adcMixing%ze(ij,i))
+              sumv = sumv + (BdoEdge(k) - Bdo(ij-1))*(ze(ij-1,i)-ze(ij,i))**2.0_RKIND/2.0_RKIND
+              lendn(k,i) = lendn(k,i) - abs(ze(ij-1,i)-ze(ij,i))
 !              lendown(k) = max(0.55,lendown(k) + abs(-(z1-zV)/(sumv)*(tke(k))))
                 if(Bdo(k-1) - Bdo(k) < 0) then
-                        minlen = abs(adcMixing%zm(k-1,i) - adcMixing%zm(k,i))
+                        minlen = abs(zm(k-1,i) - zm(k,i))
                 else
                         minlen = 0.55_RKIND
                 endif
-               adcMixing%lendn(k,i) = max(minlen,adcMixing%lendn(k,i) + sqrt(2.0/(BdoEdge(k) -  &
+               lendn(k,i) = max(minlen,lendn(k,i) + sqrt(2.0/(BdoEdge(k) -  &
                                 Bdo(ij-1))*(tke(k) - sumv)))
               exit
            endif
         enddo
 
-        adcMixing%length(k,i) = (2.0_RKIND*adcMixing%lenup(k,i)*adcMixing%lendn(k,i))  &
-          / (adcMixing%lenup(k,i) + adcMixing%lendn(k,i))
+        length(k,i) = (2.0_RKIND*lenup(k,i)*lendn(k,i))  &
+          / (lenup(k,i) + lendn(k,i))
       enddo
    enddo
 
-   adcMixing%length(1,:) = 0.55_RKIND
-   adcMixing%length(nVertLevels+1,:) = 0.55_RKIND
+   length(1,:) = 0.55_RKIND
+   length(nVertLevels+1,:) = 0.55_RKIND
 
   end subroutine dissipation_lengths2
 
@@ -209,28 +200,28 @@ module ocn_adc_mixing
       integrandTop = 0.0
       integrandBot = 0.0
       do k=1,nvertLevels
-        KE = sqrt(0.5_RKIND*(adcMixing%u2(i2,k,iCell) + adcMixing%v2(i2,k,iCell) + adcMixing%w2(i2,k,iCell)))
-        integrandTop = integrandTop + 0.5_RKIND*KE*abs(adcMixing%ze(k,iCell)**2.0_RKIND - &
-          adcMixing%ze(k+1,iCell)**2.0_RKIND)
-        integrandBot = integrandBot + KE*(adcMixing%ze(k,iCell) - adcMixing%ze(k+1,iCell))
+        KE = sqrt(0.5_RKIND*(u2(i2,k,iCell) + v2(i2,k,iCell) + w2(i2,k,iCell)))
+        integrandTop = integrandTop + 0.5_RKIND*KE*abs(ze(k,iCell)**2.0_RKIND - &
+          ze(k+1,iCell)**2.0_RKIND)
+        integrandBot = integrandBot + KE*(ze(k,iCell) - ze(k+1,iCell))
       enddo
 
       do k=2,nVertLevels
-        KE = 0.5_RKIND*(adcMixing%u2(i2,k,iCell) + adcMixing%v2(i2,k,iCell) + adcMixing%w2(i2,k,iCell))
+        KE = 0.5_RKIND*(u2(i2,k,iCell) + v2(i2,k,iCell) + w2(i2,k,iCell))
 
-        if(KE > adcMixing%EPSILON) then
+        if(KE > EPSILON) then
           lenmax = 0.53_RKIND*sqrt(2.0_RKIND*KE / (1.0E-15_RKIND + BVF(k,iCell)))
         else
           lenmax = 1.0e6_RKIND
         endif
 
-        len1 = 0.4_RKIND*abs(adcMixing%ze(k,iCell))
+        len1 = 0.4_RKIND*abs(ze(k,iCell))
         len2 = 0.2_RKIND*integrandTop / (integrandBot + 1.0E-10_RKIND)
 
-        adcMixing%length(k,iCell) = min(1.0_RKIND/(1.0_RKIND / len1 + 1.0_RKIND / len2),lenmax)
-        adcMixing%length(k,iCell) = max(adcMixing%length(k,iCell),0.55_RKIND)
+        length(k,iCell) = min(1.0_RKIND/(1.0_RKIND / len1 + 1.0_RKIND / len2),lenmax)
+        length(k,iCell) = max(length(k,iCell),0.55_RKIND)
       enddo
-      adcMixing%length(nVertLevels+1,iCell) = 1e-15_RKIND
+      length(nVertLevels+1,iCell) = 1e-15_RKIND
 !      len(1,iCell) = len(2,iCell) !1e-15
     enddo
   end subroutine build_dissipation_lengths
@@ -243,24 +234,24 @@ module ocn_adc_mixing
   real :: Sw, w3av, lareaFraction, wtav, wsav
 
   do iCell = 1,nCells
-    adcMixing%tumd(1,iCell) = 0.0_RKIND
-    adcMixing%wumd(1,iCell) = 0.0_RKIND
-    adcMixing%areaFraction(1,iCell) = 0.5_RKIND
-    adcMixing%Mc(1,iCell) = 0.0_RKIND
+    tumd(1,iCell) = 0.0_RKIND
+    wumd(1,iCell) = 0.0_RKIND
+    areaFraction(1,iCell) = 0.5_RKIND
+    Mc(1,iCell) = 0.0_RKIND
     do k=2,nVertLevels
-      w3av = 0.5_RKIND*(adcMixing%w3(i2,k-1,iCell) + adcMixing%w3(i2,k,iCell))
+      w3av = 0.5_RKIND*(w3(i2,k-1,iCell) + w3(i2,k,iCell))
 
-      Sw = w3av / (max(adcMixing%w2(i2,k,iCell)**1.5_RKIND,adcMixing%epsilon))
+      Sw = w3av / (max(w2(i2,k,iCell)**1.5_RKIND,epsilon))
       lareaFraction = 0.5_RKIND - 0.5_RKIND*Sw / sqrt(4.0_RKIND + Sw**2.0_RKIND)
 
       if(lareaFraction < 0.01_RKIND) lareaFraction = 0.01_RKIND
       if(lareaFraction > 0.99_RKIND) lareaFraction = 0.99_RKIND
 
-      adcMixing%areaFraction(k,iCell) = lareaFraction
-      adcMixing%wumd(k,iCell) = sqrt(adcMixing%w2(i2,k,iCell) / (adcMixing%areaFraction(k,iCell) * &
-        (1.0_RKIND - adcMixing%areaFraction(k,iCell))))
-      adcMixing%Mc(k,iCell) = adcMixing%areaFraction(k,iCell)*(1.0_RKIND - &
-        adcMixing%areaFraction(k,iCell)) * adcMixing%wumd(k,iCell)
+      areaFraction(k,iCell) = lareaFraction
+      wumd(k,iCell) = sqrt(w2(i2,k,iCell) / (areaFraction(k,iCell) * &
+        (1.0_RKIND - areaFraction(k,iCell))))
+      Mc(k,iCell) = areaFraction(k,iCell)*(1.0_RKIND - &
+        areaFraction(k,iCell)) * wumd(k,iCell)
     enddo
   enddo
 
@@ -279,38 +270,38 @@ module ocn_adc_mixing
     do iCell=1,nCells
       do k=2,nVertLevels
 
-        adcMixing%tumd(k,iCell) = adcMixing%wt(tlev,k,iCell) / (1.0E-12_RKIND + adcMixing%Mc(k,iCell))
-        adcMixing%sumd(k,iCell) = adcMixing%ws(tlev,k,iCell) / (1.0E-12_RKIND + adcMixing%Mc(k,iCell))
+        tumd(k,iCell) = wt(tlev,k,iCell) / (1.0E-12_RKIND + Mc(k,iCell))
+        sumd(k,iCell) = ws(tlev,k,iCell) / (1.0E-12_RKIND + Mc(k,iCell))
       enddo
 
-      wb = adcMixing%grav*(alphaT(k,iCell)*wtsfc(iCell) - betaS(k,iCell)*wssfc(iCell))
+      wb = grav*(alphaT(1,iCell)*wtsfc(iCell) - betaS(1,iCell)*wssfc(iCell))
 !      wstar = (abs(0.4*boundaryLayerDepth(iCell)*wb))**(1./3.)
 
       if(wb > 0.0) then
-        wb = adcMixing%grav*(alphaT(k,iCell)*wtsfc(iCell) - betaS(k,iCell)*wssfc(iCell))
+        wb = grav*(alphaT(k,iCell)*wtsfc(iCell) - betaS(k,iCell)*wssfc(iCell))
         wstar = (abs(0.4_RKIND*boundaryLayerDepth(iCell)*wb))**(1.0_RKIND/3.0_RKIND)
-        adcMixing%w2t(1,iCell) = -0.3_RKIND*wstar * wtsfc(iCell)
+        w2t(1,iCell) = -0.3_RKIND*wstar * wtsfc(iCell)
         !Below FIXME!
-        adcMixing%w2s(1,iCell) = 0.3_RKIND*wstar * wssfc(iCell)
+        w2s(1,iCell) = 0.3_RKIND*wstar * wssfc(iCell)
       else
-        adcMixing%w2t(1,iCell) = 0.0_RKIND
-        adcMixing%w2s(1,iCell) = 0.0_RKIND
+        w2t(1,iCell) = 0.0_RKIND
+        w2s(1,iCell) = 0.0_RKIND
       endif
 
       !try new boundary condition derived from PDF
-      sigav = 0.5_RKIND*(adcMixing%areaFraction(1,iCell) + adcMixing%areaFraction(2,iCell))
-      wtav = 0.5_RKIND*(adcMixing%wt(tlev,1,iCell) + adcMixing%wt(tlev,2,iCell))
-      McAv = 0.5_RKIND*(adcMixing%w2(tlev,1,iCell) + adcMixing%w2(tlev,2,iCell))
-      adcMixing%w2t(1,iCell) = (1.0_RKIND - 2.0_RKIND*sigav)*wtav*sqrt(McAv) / (adcMixing%EPSILON + &
+      sigav = 0.5_RKIND*(areaFraction(1,iCell) + areaFraction(2,iCell))
+      wtav = 0.5_RKIND*(wt(tlev,1,iCell) + wt(tlev,2,iCell))
+      McAv = 0.5_RKIND*(w2(tlev,1,iCell) + w2(tlev,2,iCell))
+      w2t(1,iCell) = (1.0_RKIND - 2.0_RKIND*sigav)*wtav*sqrt(McAv) / (EPSILON + &
         sigav*(1.0_RKIND-sigav))
 
       do k=2,nVertLevels
-        sigav = 0.5_RKIND*(adcMixing%areaFraction(k,iCell) + adcMixing%areaFraction(k+1,iCell))
-        tumdav = 0.5_RKIND*(adcMixing%tumd(k,iCell) + adcMixing%tumd(k+1,iCell))
-        sumdav = 0.5_RKIND*(adcMixing%sumd(k,iCell) + adcMixing%sumd(k+1,iCell))
-        wumdav = 0.5_RKIND*(adcMixing%wumd(k,iCell) + adcMixing%wumd(k+1,iCell))
-        adcMixing%w2t(k,iCell) = sigav*(1.0_RKIND - sigav)*(1.0_RKIND - 2.0_RKIND*sigav)*wumdav**2.0_RKIND*tumdav
-        adcMixing%w2s(k,iCell) = sigav*(1.0_RKIND - sigav)*(1.0_RKIND - 2.0_RKIND*sigav)*wumdav**2.0_RKIND*sumdav
+        sigav = 0.5_RKIND*(areaFraction(k,iCell) + areaFraction(k+1,iCell))
+        tumdav = 0.5_RKIND*(tumd(k,iCell) + tumd(k+1,iCell))
+        sumdav = 0.5_RKIND*(sumd(k,iCell) + sumd(k+1,iCell))
+        wumdav = 0.5_RKIND*(wumd(k,iCell) + wumd(k+1,iCell))
+        w2t(k,iCell) = sigav*(1.0_RKIND - sigav)*(1.0_RKIND - 2.0_RKIND*sigav)*wumdav**2.0_RKIND*tumdav
+        w2s(k,iCell) = sigav*(1.0_RKIND - sigav)*(1.0_RKIND - 2.0_RKIND*sigav)*wumdav**2.0_RKIND*sumdav
       enddo
 
     enddo
@@ -335,17 +326,17 @@ module ocn_adc_mixing
 
   do iCell = 1,nCells
 
-    adcMixing%lenspsU(1,iCell) = 0.0_RKIND
-    adcMixing%lenspsD(1,iCell) = 0.0_RKIND
-    adcMixing%KmU(1,iCell) = 0.0_RKIND
-    adcMixing%KhU(1,iCell) = 0.0_RKIND
-    adcMixing%KmD(1,iCell) = 0.0_RKIND
-    adcMixing%KhD(1,iCell) = 0.0_RKIND
-    adcMixing%Entrainment(1,iCell) = 0.0_RKIND
-    adcMixing%Detrainment(1,iCell) = 0.0_RKIND
+    lenspsU(1,iCell) = 0.0_RKIND
+    lenspsD(1,iCell) = 0.0_RKIND
+    KmU(1,iCell) = 0.0_RKIND
+    KhU(1,iCell) = 0.0_RKIND
+    KmD(1,iCell) = 0.0_RKIND
+    KhD(1,iCell) = 0.0_RKIND
+    Entrainment(1,iCell) = 0.0_RKIND
+    Detrainment(1,iCell) = 0.0_RKIND
 
     do k = 2,nVertLevels
-      dz = (adcMixing%zm(k-1,iCell) - adcMixing%zm(k,iCell))
+      dz = (zm(k-1,iCell) - zm(k,iCell))
       !need to add length scales for Up and Down
       Tz = (activeTracers(1,k-1,iCell) - activeTracers(1,k,iCell)) / dz
       Sz = (activeTracers(2,k-1,iCell) - activeTracers(2,k,iCell)) / dz
@@ -353,69 +344,69 @@ module ocn_adc_mixing
       Vz = (vvel(k-1,iCell) - vvel(k,iCell)) / dz
 
       if(BVF(k,iCell) <= 0.0_RKIND) then
-        adcMixing%lenspsU(k,iCell) = dz
-        adcMixing%lenspsD(k,iCell) = dz
+        lenspsU(k,iCell) = dz
+        lenspsD(k,iCell) = dz
       else
-        adcMixing%lenspsU(k,iCell) = min(dz,0.76_RKIND*sqrt(adcMixing%KspsU(k,iCell)/BVF(k,iCell)))
-        adcMixing%lenspsD(k,iCell) = min(dz,0.76_RKIND*sqrt(adcMixing%KspsD(k,iCell)/BVF(k,iCell)))
+        lenspsU(k,iCell) = min(dz,0.76_RKIND*sqrt(KspsU(k,iCell)/BVF(k,iCell)))
+        lenspsD(k,iCell) = min(dz,0.76_RKIND*sqrt(KspsD(k,iCell)/BVF(k,iCell)))
       endif
 
-      adcMixing%KmU(k,iCell) = 0.1_RKIND*adcMixing%lenspsU(k,iCell)*sqrt( adcMixing%KspsU(k,iCell) )
-      adcMixing%KhU(k,iCell) = ( 1.0_RKIND+2.0_RKIND*adcMixing%lenspsU(k,iCell)/dz)*adcMixing%KmU(k,iCell)
-      adcMixing%wt_spsU(k,iCell) =  -adcMixing%KhU(k,iCell)*Tz
-      adcMixing%ws_spsU(k,iCell) =  -adcMixing%KhU(k,iCell)*Sz
+      KmU(k,iCell) = 0.1_RKIND*lenspsU(k,iCell)*sqrt( KspsU(k,iCell) )
+      KhU(k,iCell) = ( 1.0_RKIND+2.0_RKIND*lenspsU(k,iCell)/dz)*KmU(k,iCell)
+      wt_spsU(k,iCell) =  -KhU(k,iCell)*Tz
+      ws_spsU(k,iCell) =  -KhU(k,iCell)*Sz
 
-      adcMixing%KmD(k,iCell) = 0.1_RKIND*adcMixing%lenspsD(k,iCell)*sqrt( adcMixing%KspsD(k,iCell) )
-      adcMixing%KhD(k,iCell) = ( 1.0_RKIND+2.0_RKIND*adcMixing%lenspsD(k,iCell)/dz)*adcMixing%KmD(k,iCell)
-      adcMixing%wt_spsD(k,iCell) = -adcMixing%KhD(k,iCell)*Tz
-      adcMixing%ws_spsD(k,iCell) = -adcMixing%KhD(k,iCell)*Sz
+      KmD(k,iCell) = 0.1_RKIND*lenspsD(k,iCell)*sqrt( KspsD(k,iCell) )
+      KhD(k,iCell) = ( 1.0_RKIND+2.0_RKIND*lenspsD(k,iCell)/dz)*KmD(k,iCell)
+      wt_spsD(k,iCell) = -KhD(k,iCell)*Tz
+      ws_spsD(k,iCell) = -KhD(k,iCell)*Sz
 
-      adcMixing%Entrainment(k,iCell) = adcMixing%Cww_E*adcMixing%areaFraction(k,iCell)*(1.0_RKIND- &
-        adcMixing%areaFraction(k,iCell))*adcMixing%Mc(k,iCell) / ( adcMixing%lendn(k,iCell) + adcMixing%EPSILON )
-      adcMixing%Detrainment(k,iCell) = adcMixing%Cww_D*adcMixing%areaFraction(k,iCell)*(1.0_RKIND- &
-        adcMixing%areaFraction(k,iCell))*adcMixing%Mc(k,iCell) / ( adcMixing%lenup(k,iCell) + adcMixing%EPSILON )
+      Entrainment(k,iCell) = Cww_E*areaFraction(k,iCell)*(1.0_RKIND- &
+        areaFraction(k,iCell))*Mc(k,iCell) / ( lendn(k,iCell) + EPSILON )
+      Detrainment(k,iCell) = Cww_D*areaFraction(k,iCell)*(1.0_RKIND- &
+        areaFraction(k,iCell))*Mc(k,iCell) / ( lenup(k,iCell) + EPSILON )
     enddo
 
     do k=2,nVertLevels
-      adcMixing%eps(k,iCell) = (0.5_RKIND*(adcMixing%u2(i2,k,iCell) + adcMixing%v2(i2,k,iCell) + &
-        adcMixing%w2(i2,k,iCell)))**1.5_RKIND/adcMixing%length(k,iCell)
+      eps(k,iCell) = (0.5_RKIND*(u2(i2,k,iCell) + v2(i2,k,iCell) + &
+        w2(i2,k,iCell)))**1.5_RKIND/length(k,iCell)
 
-      dz = (adcMixing%zm(k-1,iCell) - adcMixing%zm(k,iCell))
+      dz = (zm(k-1,iCell) - zm(k,iCell))
       if(k==2) then
         Cval = 3.96
       else
-        Cval = (0.19_RKIND+0.51_RKIND*adcMixing%lenspsU(k,iCell)/dz)
+        Cval = (0.19_RKIND+0.51_RKIND*lenspsU(k,iCell)/dz)
       endif
-      KspsUtend(k,iCell) = adcMixing%grav*(alphaT(k,iCell)*adcMixing%wt_spsU(k,iCell) - &
-        betaS(k,iCell)*adcMixing%ws_spsU(k,ICell)) + ((adcMixing%KmU(k-1,iCell) +                 &
-        adcMixing%KmU(k,iCell))*(adcMixing%KspsU(k-1,iCell) - adcMixing%KspsU(k,iCell)) /         &
-        (adcMixing%ze(k-1,iCell) - adcMixing%ze(k,iCell)) - (adcMixing%KmU(k,iCell) +             &
-        adcMixing%KmU(k+1,iCell)) * (adcMixing%KspsU(k,iCell) - adcMixing%KspsU(k+1,iCell)) /     &
-        (adcMixing%ze(k,iCell) - adcMixing%ze(k+1,iCell))) / dz -                                 &
-        Cval*adcMixing%KspsU(k,iCell)**1.5_RKIND/adcMixing%lenspsU(k,iCell) +                     &
-        adcMixing%eps(k,iCell) / (2.0_RKIND*adcMixing%areaFraction(k,iCell))
+      KspsUtend(k,iCell) = grav*(alphaT(k,iCell)*wt_spsU(k,iCell) - &
+        betaS(k,iCell)*ws_spsU(k,ICell)) + ((KmU(k-1,iCell) +                 &
+        KmU(k,iCell))*(KspsU(k-1,iCell) - KspsU(k,iCell)) /         &
+        (ze(k-1,iCell) - ze(k,iCell)) - (KmU(k,iCell) +             &
+        KmU(k+1,iCell)) * (KspsU(k,iCell) - KspsU(k+1,iCell)) /     &
+        (ze(k,iCell) - ze(k+1,iCell))) / dz -                                 &
+        Cval*KspsU(k,iCell)**1.5_RKIND/lenspsU(k,iCell) +                     &
+        eps(k,iCell) / (2.0_RKIND*areaFraction(k,iCell))
 
       if(k==2) then
         Cval = 3.96_RKIND
       else
-        Cval = (0.19_RKIND+0.51_RKIND*adcMixing%lenspsD(k,iCell)/dz)
+        Cval = (0.19_RKIND+0.51_RKIND*lenspsD(k,iCell)/dz)
       endif
 
-      KspsDtend(k,iCell) = adcMixing%grav*(alphaT(k,iCell)*adcMixing%wt_spsD(k,iCell) - &
-        betaS(k,iCell)*adcMixing%ws_spsD(k,iCell)) + ((adcMixing%KmD(k-1,iCell) +                 &
-        adcMixing%KmD(k,iCell))*(adcMixing%KspsD(k-1,iCell) - adcMixing%KspsD(k,iCell)) /         &
-        (adcMixing%ze(k-1,iCell) - adcMixing%ze(k,iCell)) - (adcMixing%KmD(k,iCell) +             &
-        adcMixing%KmD(k+1,iCell)) * (adcMixing%KspsD(k,iCell) - adcMixing%KspsD(k+1,iCell)) /     &
-        (adcMixing%ze(k,iCell) - adcMixing%ze(k+1,iCell))) / dz -                                 &
-        Cval*adcMixing%KspsD(k,iCell)**1.5_RKIND / adcMixing%lenspsD(k,iCell) +                   &
-        adcMixing%eps(k,iCell) / (2.0_RKIND*(1.0_RKIND - adcMixing%areaFraction(k,iCell)))
+      KspsDtend(k,iCell) = grav*(alphaT(k,iCell)*wt_spsD(k,iCell) - &
+        betaS(k,iCell)*ws_spsD(k,iCell)) + ((KmD(k-1,iCell) +                 &
+        KmD(k,iCell))*(KspsD(k-1,iCell) - KspsD(k,iCell)) /         &
+        (ze(k-1,iCell) - ze(k,iCell)) - (KmD(k,iCell) +             &
+        KmD(k+1,iCell)) * (KspsD(k,iCell) - KspsD(k+1,iCell)) /     &
+        (ze(k,iCell) - ze(k+1,iCell))) / dz -                                 &
+        Cval*KspsD(k,iCell)**1.5_RKIND / lenspsD(k,iCell) +                   &
+        eps(k,iCell) / (2.0_RKIND*(1.0_RKIND - areaFraction(k,iCell)))
     enddo
   enddo
 
   do iCell=1,nCells
     do k=2,nVertLevels
-      adcMixing%KspsU(k,iCell) = adcMixing%KspsU(k,iCell) + dt*KspsUtend(k,iCell)
-      adcMixing%KspsD(k,iCell) = adcMixing%KspsD(k,iCell) + dt*KspsDtend(k,iCell)
+      KspsU(k,iCell) = KspsU(k,iCell) + dt*KspsUtend(k,iCell)
+      KspsD(k,iCell) = KspsD(k,iCell) + dt*KspsDtend(k,iCell)
     enddo
   enddo
 
@@ -441,199 +432,199 @@ module ocn_adc_mixing
     do iCell=1,nCells
       !compute the TOMs first.
       do k=1,nVertLevels
-        Ksps = 0.5_RKIND*((adcMixing%areaFraction(k,iCell)*adcMixing%KspsU(k,iCell) + (1.0_RKIND - &
-          adcMixing%areaFraction(k,iCell))*adcMixing%KspsD(k,iCell)) + (adcMixing%areaFraction(k+1,iCell)* &
-          adcMixing%KspsU(k+1,iCell) + (1.0_RKIND-adcMixing%areaFraction(k+1,iCell))* &
-          adcMixing%KspsD(k+1,iCell)))
-        Kps = 0.5_RKIND*(adcMixing%u2(i1,k,iCell) + adcMixing%v2(i1,k,iCell) + adcMixing%w2(i2,k,iCell))
-        Kpsp1 = 0.5_RKIND*(adcMixing%u2(i1,k+1,iCell) + adcMixing%v2(i1,k+1,iCell) + adcMixing%w2(i2,k+1,iCell))
-        lenav = 0.5_RKIND*(adcMixing%length(k,iCell) + adcMixing%length(k+1,iCell))
-        diff = adcMixing%C_mom * sqrt(0.5_RKIND*(Kps + Kpsp1)) / lenav
-        dz = adcMixing%ze(k,iCell) - adcMixing%ze(k+1,iCell)
-        adcMixing%uw2(k,iCell) = -diff*(adcMixing%uw(i1,k,iCell) - adcMixing%uw(i1,k+1,iCell)) / dz
-        adcMixing%vw2(k,iCell) = -diff*(adcMixing%vw(i1,k,iCell) - adcMixing%vw(i1,k+1,iCell)) / dz
-        adcMixing%u2w(k,iCell) = -diff*(adcMixing%u2(i1,k,iCell) - adcMixing%u2(i1,k+1,iCell)) / dz
-        adcMixing%v2w(k,iCell) = -diff*(adcMixing%v2(i1,k,iCell) - adcMixing%v2(i1,k+1,iCell)) / dz
-        adcMixing%uvw(k,iCell) = -diff*(adcMixing%uv(i1,k,iCell) - adcMixing%uv(i1,k+1,iCell)) / dz
+        Ksps = 0.5_RKIND*((areaFraction(k,iCell)*KspsU(k,iCell) + (1.0_RKIND - &
+          areaFraction(k,iCell))*KspsD(k,iCell)) + (areaFraction(k+1,iCell)* &
+          KspsU(k+1,iCell) + (1.0_RKIND-areaFraction(k+1,iCell))* &
+          KspsD(k+1,iCell)))
+        Kps = 0.5_RKIND*(u2(i1,k,iCell) + v2(i1,k,iCell) + w2(i2,k,iCell))
+        Kpsp1 = 0.5_RKIND*(u2(i1,k+1,iCell) + v2(i1,k+1,iCell) + w2(i2,k+1,iCell))
+        lenav = 0.5_RKIND*(length(k,iCell) + length(k+1,iCell))
+        diff = C_mom * sqrt(0.5_RKIND*(Kps + Kpsp1)) / lenav
+        dz = ze(k,iCell) - ze(k+1,iCell)
+        uw2(k,iCell) = -diff*(uw(i1,k,iCell) - uw(i1,k+1,iCell)) / dz
+        vw2(k,iCell) = -diff*(vw(i1,k,iCell) - vw(i1,k+1,iCell)) / dz
+        u2w(k,iCell) = -diff*(u2(i1,k,iCell) - u2(i1,k+1,iCell)) / dz
+        v2w(k,iCell) = -diff*(v2(i1,k,iCell) - v2(i1,k+1,iCell)) / dz
+        uvw(k,iCell) = -diff*(uv(i1,k,iCell) - uv(i1,k+1,iCell)) / dz
 
-        diff = adcMixing%C_therm*sqrt(0.5*(Kps + Kpsp1)) / lenav
-        adcMixing%uwt(k,iCell) = -diff*(adcMixing%ut(i1,k,iCell) - adcMixing%ut(i1,k+1,iCell)) / dz
-        adcMixing%vwt(k,iCell) = -diff*(adcMixing%vt(i1,k,iCell) - adcMixing%vt(i1,k+1,iCell)) / dz
-        adcMixing%uws(k,iCell) = -diff*(adcMixing%us(i1,k,iCell) - adcMixing%us(i1,k+1,iCell)) / dz
-        adcMixing%vws(k,iCell) = -diff*(adcMixing%vs(i1,k,iCell) - adcMixing%vs(i1,k+1,iCell)) / dz
+        diff = C_therm*sqrt(0.5*(Kps + Kpsp1)) / lenav
+        uwt(k,iCell) = -diff*(ut(i1,k,iCell) - ut(i1,k+1,iCell)) / dz
+        vwt(k,iCell) = -diff*(vt(i1,k,iCell) - vt(i1,k+1,iCell)) / dz
+        uws(k,iCell) = -diff*(us(i1,k,iCell) - us(i1,k+1,iCell)) / dz
+        vws(k,iCell) = -diff*(vs(i1,k,iCell) - vs(i1,k+1,iCell)) / dz
       enddo
 
       do k=2,nVertLevels
-        dz = adcMixing%ze(k,iCell) - adcMixing%ze(k+1,iCell)
-        dzmid = adcMixing%zm(k-1,iCell) - adcMixing%zm(k,iCell)
+        dz = ze(k,iCell) - ze(k+1,iCell)
+        dzmid = zm(k-1,iCell) - zm(k,iCell)
         Uz = (uvel(k-1,iCell) - uvel(k,iCell)) / dz
         Vz = (vvel(k-1,iCell) - vvel(k,iCell)) / dz
 
-        Kps = sqrt((adcMixing%u2(i1,k,iCell) + adcMixing%v2(i1,k,iCell) + adcMixing%w2(i2,k,iCell)))
-        B = adcMixing%grav*(alphaT(k,iCell)*adcMixing%wt(i1,k,iCell) - betaS(k,iCell)*adcMixing%ws(i1,k,iCell))
+        Kps = sqrt((u2(i1,k,iCell) + v2(i1,k,iCell) + w2(i2,k,iCell)))
+        B = grav*(alphaT(k,iCell)*wt(i1,k,iCell) - betaS(k,iCell)*ws(i1,k,iCell))
 
-        taupt(k,iCell) = Kps / (sqrt(2.0)*adcMixing%c_pt*adcMixing%length(k,iCell))
-        taups(k,iCell) = Kps / (sqrt(2.0)*adcMixing%c_ps*adcMixing%length(k,iCell))
+        taupt(k,iCell) = Kps / (sqrt(2.0)*c_pt*length(k,iCell))
+        taups(k,iCell) = Kps / (sqrt(2.0)*c_ps*length(k,iCell))
 
         !PDF formulation will allow for fairly easy generalization of vertical tracer fluxes to
         !all tracers, write in tumd, sumd, wumd form, not sure how to do horizontal fluxes though
-        adcMixing%wttend1(k,iCell) = -(adcMixing%w2t(k-1,iCell) - adcMixing%w2t(k,iCell)) / dzmid
-        adcMixing%wttend2(k,iCell) = -adcMixing%w2(i1,k,iCell)*(activeTracers(1,k-1,iCell) &
+        wttend1(k,iCell) = -(w2t(k-1,iCell) - w2t(k,iCell)) / dzmid
+        wttend2(k,iCell) = -w2(i1,k,iCell)*(activeTracers(1,k-1,iCell) &
           - activeTracers(1,k,iCell)) / dzmid
-        adcMixing%wttend3(k,iCell) = (1.0_RKIND - adcMixing%gamma1)*adcMixing%grav*(alphaT(k,iCell) &
-          *adcMixing%t2(i2,k,iCell) - betaS(k,iCell)*adcMixing%ts(i2,k,iCell))
-        adcMixing%wttend4(k,iCell) = -adcMixing%alpha3/4.0*(adcMixing%ut(i1,k,iCell)*Uz + &
-          adcMixing%vt(i1,k,iCell)*Vz)
-        adcMixing%wttend5(k,iCell) = adcMixing%kappa_FL*(adcMixing%wt(i1,k-1,iCell) -       &
-              adcMixing%wt(i1,k+1,iCell)) / (adcMixing%ze(k-1,iCell) - adcMixing%ze(k+1,iCell))**2.0
+        wttend3(k,iCell) = (1.0_RKIND - gamma1)*grav*(alphaT(k,iCell) &
+          *t2(i2,k,iCell) - betaS(k,iCell)*ts(i2,k,iCell))
+        wttend4(k,iCell) = -alpha3/4.0*(ut(i1,k,iCell)*Uz + &
+          vt(i1,k,iCell)*Vz)
+        wttend5(k,iCell) = kappa_FL*(wt(i1,k-1,iCell) -       &
+              wt(i1,k+1,iCell)) / (ze(k-1,iCell) - ze(k+1,iCell))**2.0
 
-        wttend(k,iCell) = adcMixing%wttend1(k,iCell) + adcMixing%wttend2(k,iCell) +        &
-          adcMixing%wttend3(k,iCell) + adcMixing%wttend4(k,iCell) + adcMixing%wttend5(k,iCell)
+        wttend(k,iCell) = wttend1(k,iCell) + wttend2(k,iCell) +        &
+          wttend3(k,iCell) + wttend4(k,iCell) + wttend5(k,iCell)
 
-        adcMixing%wstend1(k,iCell) = -(adcMixing%w2s(k-1,iCell) - adcMixing%w2s(k,iCell)) / dz
-        adcMixing%wstend2(k,iCell) = -adcMixing%w2(i1,k,iCell)*(activeTracers(2,k-1,iCell) &
+        wstend1(k,iCell) = -(w2s(k-1,iCell) - w2s(k,iCell)) / dz
+        wstend2(k,iCell) = -w2(i1,k,iCell)*(activeTracers(2,k-1,iCell) &
           - activeTracers(2,k,iCell)) / dz
-        adcMixing%wstend3(k,iCell) = (1.0_RKIND - adcMixing%gamma1)*adcMixing%grav*(alphaT(k,iCell)* &
-          adcMixing%ts(i2,k,iCell) - betaS(k,iCell)*adcMixing%s2(i2,k,iCell))
-        adcMixing%wstend4(k,iCell) = -adcMixing%alpha3/4.0*(adcMixing%us(i1,k,iCell)*Uz + &
-          adcMixing%vs(i1,k,iCell)*Vz)
-        adcMixing%wsTend5(k,iCell) = adcMixing%kappa_FL*(adcMixing%ws(i1,k-1,iCell) -     &
-          adcMixing%ws(i1,k+1,iCell)) / (adcMixing%ze(k-1,iCell) - adcMixing%ze(k+1,iCell))**2.0_RKIND
+        wstend3(k,iCell) = (1.0_RKIND - gamma1)*grav*(alphaT(k,iCell)* &
+          ts(i2,k,iCell) - betaS(k,iCell)*s2(i2,k,iCell))
+        wstend4(k,iCell) = -alpha3/4.0*(us(i1,k,iCell)*Uz + &
+          vs(i1,k,iCell)*Vz)
+        wsTend5(k,iCell) = kappa_FL*(ws(i1,k-1,iCell) -     &
+          ws(i1,k+1,iCell)) / (ze(k-1,iCell) - ze(k+1,iCell))**2.0_RKIND
 
-        wstend(k,iCell) = adcMixing%wstend1(k,iCell) + adcMixing%wstend2(k,iCell) + &
-          adcMixing%wstend3(k,iCell) + adcMixing%wstend4(k,iCell) + adcMixing%wstend5(k,iCell)
+        wstend(k,iCell) = wstend1(k,iCell) + wstend2(k,iCell) + &
+          wstend3(k,iCell) + wstend4(k,iCell) + wstend5(k,iCell)
 
-        taupv(k,iCell) = Kps / (adcMixing%c_pv*adcMixing%length(k,iCell))
+        taupv(k,iCell) = Kps / (c_pv*length(k,iCell))
 
-        adcMixing%uwtend1(k,iCell) = -(adcMixing%uw2(k-1,iCell) - adcMixing%uw2(k,iCell)) / dz
-        adcMixing%uwtend2(k,iCell) = 0.5*((0.8-4.0/3.0*adcMixing%alpha1)*0.5*Kps**2.0 +  &
-          (adcMixing%alpha1 - adcMixing%alpha2)*adcMixing%u2(i1,k,iCell) + (adcMixing%alpha1 +  &
-          adcMixing%alpha2 - 2.0_RKIND)*adcMixing%w2(i1,k,iCell))*Uz
-        adcMixing%uwtend3(k,iCell) = 0.5_RKIND*(adcMixing%alpha1 - adcMixing%alpha2)*    &
-          adcMixing%uv(i1,k,iCell)*Vz
-        adcMixing%uwtend4(k,iCell) = adcMixing%beta5*adcMixing%grav*(alphaT(k,iCell)*   &
-          adcMixing%ut(i1,k,iCell) - betaS(k,iCell)*adcMixing%us(i1,k,iCell))
-        adcMixing%uwtend5(k,iCell) = - 2.0_RKIND*taupv(k,iCell)*adcMixing%uw(i1,k,iCell) + &
-          adcMixing%kappa_FL*(adcMixing%uw(i1,k-1,iCell) - adcMixing%uw(i1,k+1,iCell)) / &
-          (adcMixing%ze(k-1,iCell) - adcMixing%ze(k+1,iCell))**2.0
+        uwtend1(k,iCell) = -(uw2(k-1,iCell) - uw2(k,iCell)) / dz
+        uwtend2(k,iCell) = 0.5*((0.8-4.0/3.0*alpha1)*0.5*Kps**2.0 +  &
+          (alpha1 - alpha2)*u2(i1,k,iCell) + (alpha1 +  &
+          alpha2 - 2.0_RKIND)*w2(i1,k,iCell))*Uz
+        uwtend3(k,iCell) = 0.5_RKIND*(alpha1 - alpha2)*    &
+          uv(i1,k,iCell)*Vz
+        uwtend4(k,iCell) = beta5*grav*(alphaT(k,iCell)*   &
+          ut(i1,k,iCell) - betaS(k,iCell)*us(i1,k,iCell))
+        uwtend5(k,iCell) = - 2.0_RKIND*taupv(k,iCell)*uw(i1,k,iCell) + &
+          kappa_FL*(uw(i1,k-1,iCell) - uw(i1,k+1,iCell)) / &
+          (ze(k-1,iCell) - ze(k+1,iCell))**2.0
 
-        uwtend(k,iCell) = adcMixing%uwtend1(k,iCell) + adcMixing%uwtend2(k,iCell) + &
-          adcMixing%uwtend3(k,iCell) + adcMixing%uwtend4(k,iCell) + adcMixing%uwtend5(k,iCell)
+        uwtend(k,iCell) = uwtend1(k,iCell) + uwtend2(k,iCell) + &
+          uwtend3(k,iCell) + uwtend4(k,iCell) + uwtend5(k,iCell)
 
-        vwtend(k,iCell) = (-(adcMixing%vw2(k-1,iCell) - adcMixing%vw2(k,iCell)) / dz +   &
-          0.5_RKIND*((0.8_RKIND-4.0_RKIND/3.0_RKIND*adcMixing%alpha1)*0.5_RKIND*Kps**2.0_RKIND +  &
-          (adcMixing%alpha1 - adcMixing%alpha2)*adcMixing%v2(i1,k,iCell) + (adcMixing%alpha1 -   &
-          adcMixing%alpha2 - 2.0_RKIND)*adcMixing%w2(i1,k,iCell))*Vz + 0.5_RKIND*(adcMixing%alpha1 &
-          - adcMixing%alpha2)*adcMixing%uv(i1,k,iCell)*Uz + adcMixing%beta5*adcMixing%grav*       &
-          (alphaT(k,iCell)*adcMixing%vt(i1,k,iCell) - betaS(k,iCell)*adcMixing%vs(i1,k,iCell))) -            &
-          taupv(k,iCell)*adcMixing%vw(i1,k,iCell) + adcMixing%kappa_FL*(adcMixing%vw(i1,k-1,iCell) &
-          - adcMixing%vw(i1,k+1,iCell)) / (adcMixing%ze(k-1,iCell) - adcMixing%ze(k+1,iCell))**2.0
+        vwtend(k,iCell) = (-(vw2(k-1,iCell) - vw2(k,iCell)) / dz +   &
+          0.5_RKIND*((0.8_RKIND-4.0_RKIND/3.0_RKIND*alpha1)*0.5_RKIND*Kps**2.0_RKIND +  &
+          (alpha1 - alpha2)*v2(i1,k,iCell) + (alpha1 -   &
+          alpha2 - 2.0_RKIND)*w2(i1,k,iCell))*Vz + 0.5_RKIND*(alpha1 &
+          - alpha2)*uv(i1,k,iCell)*Uz + beta5*grav*       &
+          (alphaT(k,iCell)*vt(i1,k,iCell) - betaS(k,iCell)*vs(i1,k,iCell))) -            &
+          taupv(k,iCell)*vw(i1,k,iCell) + kappa_FL*(vw(i1,k-1,iCell) &
+          - vw(i1,k+1,iCell)) / (ze(k-1,iCell) - ze(k+1,iCell))**2.0
 
-        uvtend(k,iCell) = (-(adcMixing%uvw(k-1,iCell) - adcMixing%uvw(k,iCell)) / dz + &
-          (1.0_RKIND - 0.5_RKIND*(adcMixing%alpha1+adcMixing%alpha2))*(adcMixing%uw(i1,k,iCell)*Vz &
-          + adcMixing%vw(i1,k,iCell)*Uz)) - taupv(k,iCell)*adcMixing%uv(i1,k,iCell) +           &
-          adcMixing%kappa_VAR*(adcMixing%uv(i1,k-1,iCell) - adcMixing%uv(i1,k+1,iCell)) /       &
-          (adcMixing%ze(k-1,iCell) - adcMixing%ze(k+1,iCell))**2.0_RKIND
+        uvtend(k,iCell) = (-(uvw(k-1,iCell) - uvw(k,iCell)) / dz + &
+          (1.0_RKIND - 0.5_RKIND*(alpha1+alpha2))*(uw(i1,k,iCell)*Vz &
+          + vw(i1,k,iCell)*Uz)) - taupv(k,iCell)*uv(i1,k,iCell) +           &
+          kappa_VAR*(uv(i1,k-1,iCell) - uv(i1,k+1,iCell)) /       &
+          (ze(k-1,iCell) - ze(k+1,iCell))**2.0_RKIND
 
-        adcMixing%u2tend1(k,iCell) = -(adcMixing%u2w(k-1,iCell) - adcMixing%u2w(k,iCell)) / dz
-        adcMixing%u2tend2(k,iCell) = (1.0_RKIND/3.0_RKIND*adcMixing%alpha1 + adcMixing%alpha2 - &
-          2.0_RKIND)*adcMixing%uw(i1,k,iCell)*Uz
-        adcMixing%u2tend3(k,iCell) = - 2.0_RKIND/3.0_RKIND*adcMixing%alpha1*adcMixing%vw(i1,k,iCell)*Vz
-        adcMixing%u2tend4(k,iCell) = 2.0_RKIND/3.0_RKIND*(1.0_RKIND-adcMixing%beta5)*B
-        adcMixing%u2tend5(k,iCell) = -2.0_RKIND/3.0_RKIND*adcMixing%eps(k,iCell) + &
-          taupv(k,iCell)*(Kps**2.0_RKIND/3.0_RKIND - adcMixing%u2(i1,k,iCell))
+        u2tend1(k,iCell) = -(u2w(k-1,iCell) - u2w(k,iCell)) / dz
+        u2tend2(k,iCell) = (1.0_RKIND/3.0_RKIND*alpha1 + alpha2 - &
+          2.0_RKIND)*uw(i1,k,iCell)*Uz
+        u2tend3(k,iCell) = - 2.0_RKIND/3.0_RKIND*alpha1*vw(i1,k,iCell)*Vz
+        u2tend4(k,iCell) = 2.0_RKIND/3.0_RKIND*(1.0_RKIND-beta5)*B
+        u2tend5(k,iCell) = -2.0_RKIND/3.0_RKIND*eps(k,iCell) + &
+          taupv(k,iCell)*(Kps**2.0_RKIND/3.0_RKIND - u2(i1,k,iCell))
 
-        u2tend(k,iCell) = adcMixing%u2tend1(k,iCell) + adcMixing%u2tend2(k,iCell) + &
-          adcMixing%u2tend3(k,iCell) + adcMixing%u2tend4(k,iCell) + adcMixing%u2tend5(k,iCell)
+        u2tend(k,iCell) = u2tend1(k,iCell) + u2tend2(k,iCell) + &
+          u2tend3(k,iCell) + u2tend4(k,iCell) + u2tend5(k,iCell)
 
-        adcMixing%v2tend1(k,iCell) = -(adcMixing%v2w(k-1,iCell) - adcMixing%v2w(k,iCell)) / dz
-        adcMixing%v2tend2(k,iCell) = (1.0_RKIND/3.0_RKIND*adcMixing%alpha1 +adcMixing%alpha2 - &
-          2.0_RKIND)*adcMixing%vw(i1,k,iCell)*Vz
-        adcMixing%v2tend3(k,iCell) = - 2.0_RKIND/3.0_RKIND*adcMixing%alpha1*adcMixing%uw(i1,k,iCell)*Uz
-        adcMixing%v2tend4(k,iCell) = 2.0_RKIND/3.0_RKIND*(1-adcMixing%beta5)*B
-        adcMixing%v2tend5(k,iCell) = -2.0_RKIND/3.0_RKIND*adcMixing%eps(k,iCell) + taupv(k,iCell)* &
-          (Kps**2/3. - adcMixing%v2(i1,k,iCell))
+        v2tend1(k,iCell) = -(v2w(k-1,iCell) - v2w(k,iCell)) / dz
+        v2tend2(k,iCell) = (1.0_RKIND/3.0_RKIND*alpha1 +alpha2 - &
+          2.0_RKIND)*vw(i1,k,iCell)*Vz
+        v2tend3(k,iCell) = - 2.0_RKIND/3.0_RKIND*alpha1*uw(i1,k,iCell)*Uz
+        v2tend4(k,iCell) = 2.0_RKIND/3.0_RKIND*(1-beta5)*B
+        v2tend5(k,iCell) = -2.0_RKIND/3.0_RKIND*eps(k,iCell) + taupv(k,iCell)* &
+          (Kps**2/3. - v2(i1,k,iCell))
 
-        v2tend(k,iCell) = adcMixing%v2tend1(k,iCell) + adcMixing%v2tend2(k,iCell) + &
-          adcMixing%v2tend3(k,iCell) + adcMixing%v2tend4(k,iCell) + adcMixing%v2tend5(k,iCell)
+        v2tend(k,iCell) = v2tend1(k,iCell) + v2tend2(k,iCell) + &
+          v2tend3(k,iCell) + v2tend4(k,iCell) + v2tend5(k,iCell)
 
-        !taupt = Kps / (2.0*adcMixing%c_pt*len(k,iCell))
-        !taups = Kps / (2.0*adcMixing%c_ps*len(k,iCell))
+        !taupt = Kps / (2.0*c_pt*len(k,iCell))
+        !taups = Kps / (2.0*c_ps*len(k,iCell))
 
         Tz = (activeTracers(1,k-1,iCell) - activeTracers(1,k,iCell)) / dz
         Sz = (activeTracers(2,k-1,iCell) - activeTracers(2,k,iCell)) / dz
 
-        uttend(k,iCell) = (-(adcMixing%uwt(k-1,iCell) - adcMixing%uwt(k,iCell))/dz -  &
-          adcMixing%uw(i1,k,iCell)*Tz - (1.0_RKIND - adcMixing%alpha3)*adcMixing%wt(i1,k,iCell) &
-          *Uz) - adcMixing%ut(i1,k,iCell)*taupt(k,iCell)
+        uttend(k,iCell) = (-(uwt(k-1,iCell) - uwt(k,iCell))/dz -  &
+          uw(i1,k,iCell)*Tz - (1.0_RKIND - alpha3)*wt(i1,k,iCell) &
+          *Uz) - ut(i1,k,iCell)*taupt(k,iCell)
 
-        vttend(k,iCell) = (-(adcMixing%vwt(k-1,iCell) - adcMixing%vwt(k,iCell))/dz -  &
-          adcMixing%vw(i1,k,iCell)*Tz - (1.0_RKIND - adcMixing%alpha3)*adcMixing%wt(i1,k,iCell) &
-          *Vz) - adcMixing%vt(i1,k,iCell)*taupt(k,iCell)
+        vttend(k,iCell) = (-(vwt(k-1,iCell) - vwt(k,iCell))/dz -  &
+          vw(i1,k,iCell)*Tz - (1.0_RKIND - alpha3)*wt(i1,k,iCell) &
+          *Vz) - vt(i1,k,iCell)*taupt(k,iCell)
 
-        ustend(k,iCell) = (-(adcMixing%uws(k-1,iCell) - adcMixing%uws(k,iCell))/dz -  &
-          adcMixing%uw(i1,k,iCell)*Sz - (1.0_RKIND - adcMixing%alpha3)*adcMixing%ws(i1,k,iCell) &
-          *Uz) - adcMixing%us(i1,k,iCell)*taups(k,ICell)
+        ustend(k,iCell) = (-(uws(k-1,iCell) - uws(k,iCell))/dz -  &
+          uw(i1,k,iCell)*Sz - (1.0_RKIND - alpha3)*ws(i1,k,iCell) &
+          *Uz) - us(i1,k,iCell)*taups(k,ICell)
 
-        vstend(k,iCell) = (-(adcMixing%vws(k-1,iCell) - adcMixing%vws(k,iCell))/dz -  &
-          adcMixing%vw(i1,k,iCell)*Sz - (1.0_RKIND - adcMixing%alpha3)*adcMixing%ws(i1,k,iCell)* &
-          Vz) - adcMixing%vs(i1,k,iCell)*taups(k,iCell)
+        vstend(k,iCell) = (-(vws(k-1,iCell) - vws(k,iCell))/dz -  &
+          vw(i1,k,iCell)*Sz - (1.0_RKIND - alpha3)*ws(i1,k,iCell)* &
+          Vz) - vs(i1,k,iCell)*taups(k,iCell)
 
-        adcMixing%t2(i2,k,iCell) = adcMixing%tumd(k,iCell)**2.0_RKIND*adcMixing%areaFraction(k,iCell)*&
-          (1.0_RKIND-adcMixing%areaFraction(k,iCell))
-        adcMixing%s2(i2,k,iCell) = adcMixing%sumd(k,iCell)**2.0_RKIND*adcMixing%areaFraction(k,iCell)*&
-          (1.0_RKIND-adcMixing%areaFraction(k,iCell))
-        adcMixing%ts(i2,k,iCell) = adcMixing%tumd(k,iCell)*adcMixing%sumd(k,iCell)* &
-          adcMixing%areaFraction(k,iCell)*(1.0_RKIND-adcMixing%areaFraction(k,iCell))
+        t2(i2,k,iCell) = tumd(k,iCell)**2.0_RKIND*areaFraction(k,iCell)*&
+          (1.0_RKIND-areaFraction(k,iCell))
+        s2(i2,k,iCell) = sumd(k,iCell)**2.0_RKIND*areaFraction(k,iCell)*&
+          (1.0_RKIND-areaFraction(k,iCell))
+        ts(i2,k,iCell) = tumd(k,iCell)*sumd(k,iCell)* &
+          areaFraction(k,iCell)*(1.0_RKIND-areaFraction(k,iCell))
 
       enddo
     enddo
 
     do iCell=1,nCells
-      adcMixing%u2cliptend(:,iCell) = 0.0_RKIND
-      adcMixing%v2cliptend(:,iCell) = 0.0_RKIND
+      u2cliptend(:,iCell) = 0.0_RKIND
+      v2cliptend(:,iCell) = 0.0_RKIND
       do k=2,nVertLevels
-        adcMixing%u2(i2,k,iCell) = adcMixing%u2(i1,k,iCell) + dt*u2tend(k,iCell)
-        if(adcMixing%u2(i2,k,iCell) < 0.0_RKIND) then
-          adcMixing%u2cliptend(k,iCell) = -adcMixing%u2(i2,k,iCell)
-          adcMixing%u2(i2,k,iCell) = 0.0_RKIND
+        u2(i2,k,iCell) = u2(i1,k,iCell) + dt*u2tend(k,iCell)
+        if(u2(i2,k,iCell) < 0.0_RKIND) then
+          u2cliptend(k,iCell) = -u2(i2,k,iCell)
+          u2(i2,k,iCell) = 0.0_RKIND
         endif
 
-        adcMixing%v2(i2,k,iCell) = adcMixing%v2(i1,k,iCell) + dt*v2tend(k,iCell)
-        if(adcMixing%v2(i2,k,iCell) < 0.0_RKIND) then
-          adcMixing%v2cliptend(k,iCell) = -adcMixing%v2(i2,k,iCell)
-          adcMixing%v2(i2,k,iCell) = 0.0_RKIND
+        v2(i2,k,iCell) = v2(i1,k,iCell) + dt*v2tend(k,iCell)
+        if(v2(i2,k,iCell) < 0.0_RKIND) then
+          v2cliptend(k,iCell) = -v2(i2,k,iCell)
+          v2(i2,k,iCell) = 0.0_RKIND
         endif
 
-        adcMixing%uw(i2,k,iCell) = adcMixing%uw(i1,k,iCell) + dt*uwtend(k,iCell)
-        adcMixing%vw(i2,k,iCell) = adcMixing%vw(i1,k,iCell) + dt*vwtend(k,iCell)
-        adcMixing%uv(i2,k,iCell) = adcMixing%uv(i1,k,iCell) + dt*uvtend(k,iCell)
-        adcMixing%ut(i2,k,iCell) = adcMixing%ut(i1,k,iCell) + dt*uttend(k,iCell)
-        adcMixing%wt(i2,k,iCell) = (adcMixing%wt(i1,k,iCell) + dt*wttend(k,iCell)) / &
+        uw(i2,k,iCell) = uw(i1,k,iCell) + dt*uwtend(k,iCell)
+        vw(i2,k,iCell) = vw(i1,k,iCell) + dt*vwtend(k,iCell)
+        uv(i2,k,iCell) = uv(i1,k,iCell) + dt*uvtend(k,iCell)
+        ut(i2,k,iCell) = ut(i1,k,iCell) + dt*uttend(k,iCell)
+        wt(i2,k,iCell) = (wt(i1,k,iCell) + dt*wttend(k,iCell)) / &
           (1.0_RKIND + dt*taupt(k,iCell))
-        adcMixing%vt(i2,k,iCell) = adcMixing%vt(i1,k,iCell) + dt*vttend(k,iCell)
-        adcMixing%us(i2,k,iCell) = adcMixing%us(i1,k,iCell) + dt*ustend(k,iCell)
-        adcMixing%vs(i2,k,iCell) = adcMixing%vs(i1,k,iCell) + dt*vstend(k,iCell)
-        adcMixing%ws(i2,k,iCell) = (adcMixing%ws(i1,k,iCell) + dt*wstend(k,iCell)) / &
+        vt(i2,k,iCell) = vt(i1,k,iCell) + dt*vttend(k,iCell)
+        us(i2,k,iCell) = us(i1,k,iCell) + dt*ustend(k,iCell)
+        vs(i2,k,iCell) = vs(i1,k,iCell) + dt*vstend(k,iCell)
+        ws(i2,k,iCell) = (ws(i1,k,iCell) + dt*wstend(k,iCell)) / &
           (1.0_RKIND + dt*taups(k,iCell))
-        if(abs(adcMixing%wt(i2,k,iCell)) > 1.0_RKIND) then
+        if(abs(wt(i2,k,iCell)) > 1.0_RKIND) then
           call mpas_log_write("ERROR: wt out of range, wt = %r, location = $i, $i", &
-            MPAS_LOG_CRIT,realArgs=(/adcMixing%wt(i2,k,iCell)/),intArgs=(/k,iCell/))
+            MPAS_LOG_CRIT,realArgs=(/wt(i2,k,iCell)/),intArgs=(/k,iCell/))
         endif
 
-        if(abs(adcMixing%ws(i2,k,iCell)) > 1.0_RKIND) then
+        if(abs(ws(i2,k,iCell)) > 1.0_RKIND) then
           call mpas_log_write("ERROR: ws out of range, ws = %r, location = $i, $i", &
-            MPAS_LOG_CRIT,realArgs=(/adcMixing%ws(i2,k,iCell)/),intArgs=(/k,iCell/))
+            MPAS_LOG_CRIT,realArgs=(/ws(i2,k,iCell)/),intArgs=(/k,iCell/))
         endif
 
-        if(abs(adcMixing%u2(i2,k,iCell)) > 1.0_RKIND) then
+        if(abs(u2(i2,k,iCell)) > 1.0_RKIND) then
           call mpas_log_write("ERROR: u2 out of range, u2 = %r, location = $i, $i", &
-            MPAS_LOG_CRIT,realArgs=(/adcMixing%u2(i2,k,iCell)/),intArgs=(/k,iCell/))
+            MPAS_LOG_CRIT,realArgs=(/u2(i2,k,iCell)/),intArgs=(/k,iCell/))
         endif
 
-        if(abs(adcMixing%v2(i2,k,iCell)) > 1.0_RKIND) then
+        if(abs(v2(i2,k,iCell)) > 1.0_RKIND) then
           call mpas_log_write("ERROR: v2 out of range, v2 = %r, location = $i, $i", &
-            MPAS_LOG_CRIT,realArgs=(/adcMixing%v2(i2,k,iCell)/),intArgs=(/k,iCell/))
+            MPAS_LOG_CRIT,realArgs=(/v2(i2,k,iCell)/),intArgs=(/k,iCell/))
         endif
 
       enddo
@@ -661,64 +652,64 @@ module ocn_adc_mixing
 
     do iCell = 1,nCells
       do k=1,nVertLevels
-        Eav = 0.5*(adcMixing%Entrainment(k+1,iCell) + adcMixing%Entrainment(k,iCell))
-        Dav = 0.5*(adcMixing%Detrainment(k+1,iCell) + adcMixing%Detrainment(k,iCell))
-        u2av = 0.5*(adcMixing%u2(i1,k,iCell) + adcMixing%u2(i1,k+1,iCell))
-        v2av = 0.5*(adcMixing%v2(i1,k,iCell) + adcMixing%v2(i1,k+1,iCell))
-        w2av = 0.5*(adcMixing%w2(i1,k,iCell) + adcMixing%w2(i1,k+1,iCell))
+        Eav = 0.5*(Entrainment(k+1,iCell) + Entrainment(k,iCell))
+        Dav = 0.5*(Detrainment(k+1,iCell) + Detrainment(k,iCell))
+        u2av = 0.5*(u2(i1,k,iCell) + u2(i1,k+1,iCell))
+        v2av = 0.5*(v2(i1,k,iCell) + v2(i1,k+1,iCell))
+        w2av = 0.5*(w2(i1,k,iCell) + w2(i1,k+1,iCell))
 
-        sigav = 0.5*(adcMixing%areaFraction(k,iCell) + adcMixing%areaFraction(k+1,iCell))
-        wumdav = 0.5*(adcMixing%wumd(k,iCell) + adcMixing%wumd(k+1,iCell))
-        tumdav = 0.5*(adcMixing%tumd(k,iCell) + adcMixing%tumd(k+1,iCell))
-        sumdav = 0.5*(adcMixing%sumd(k,iCell) + adcMixing%sumd(k+1,iCell))
-        KspsUav = 0.5*(adcMixing%KspsU(k,iCell) + adcMixing%KspsU(k+1,iCell))
-        KspsDav = 0.5*(adcMixing%KspsD(k,iCell) + adcMixing%KspsD(k+1,iCell))
-        Mcav = 0.5*(adcMixing%Mc(k,iCell) + adcMixing%Mc(k+1,iCell))
-        lenav = 0.5*(adcMixing%length(k,iCell) + adcMixing%length(k+1,iCell))
+        sigav = 0.5*(areaFraction(k,iCell) + areaFraction(k+1,iCell))
+        wumdav = 0.5*(wumd(k,iCell) + wumd(k+1,iCell))
+        tumdav = 0.5*(tumd(k,iCell) + tumd(k+1,iCell))
+        sumdav = 0.5*(sumd(k,iCell) + sumd(k+1,iCell))
+        KspsUav = 0.5*(KspsU(k,iCell) + KspsU(k+1,iCell))
+        KspsDav = 0.5*(KspsD(k,iCell) + KspsD(k+1,iCell))
+        Mcav = 0.5*(Mc(k,iCell) + Mc(k+1,iCell))
+        lenav = 0.5*(length(k,iCell) + length(k+1,iCell))
         if(k==nVertLevels) then
-          sigavp1 = 0.5*(adcMixing%areaFraction(k,iCell))
-          wumdAvp1 = 0.5*(adcMixing%wumd(k,iCell))
-          tumdAvp1 = 0.5*(adcMixing%tumd(k,iCell))
-          sumdAvp1 = 0.5*(adcMixing%sumd(k,iCell))
+          sigavp1 = 0.5*(areaFraction(k,iCell))
+          wumdAvp1 = 0.5*(wumd(k,iCell))
+          tumdAvp1 = 0.5*(tumd(k,iCell))
+          sumdAvp1 = 0.5*(sumd(k,iCell))
         else
-          sigavp1 = 0.5*(adcMixing%areaFraction(k,iCell) + adcMixing%areaFraction(k+1,iCell))
-          wumdAvp1 = 0.5*(adcMixing%wumd(k,iCell) + adcMixing%wumd(k+1,iCell))
-          tumdAvp1 = 0.5*(adcMixing%tumd(k,iCell) + adcMixing%tumd(k+1,iCell))
-          sumdAvp1 = 0.5*(adcMixing%sumd(k,iCell) + adcMixing%sumd(k+1,iCell))
+          sigavp1 = 0.5*(areaFraction(k,iCell) + areaFraction(k+1,iCell))
+          wumdAvp1 = 0.5*(wumd(k,iCell) + wumd(k+1,iCell))
+          tumdAvp1 = 0.5*(tumd(k,iCell) + tumd(k+1,iCell))
+          sumdAvp1 = 0.5*(sumd(k,iCell) + sumd(k+1,iCell))
         endif
 
         KEsps = sigav*KspsUav+ (1.0 - sigav)*KspsDav
         KE = sqrt((u2av+v2av+w2av) + 0.0*KEsps)
 
-        dz = adcMixing%ze(k,iCell) - adcMixing%ze(k+1,iCell)
+        dz = ze(k,iCell) - ze(k+1,iCell)
         !KE = sqrt(areaFraction(k,iCell)*KspsUav + (1.0 - areaFraction(k,iCell))*KspsDav)
-        Swup = - 2.0/3.0*(adcMixing%KspsU(k,iCell) - adcMixing%KspsU(k+1,iCell)) / dz &
-           - 2.0/3.0*KspsUav*(log(adcMixing%areaFraction(k,iCell)) -           &
-          log(adcMixing%areaFraction(k+1,iCell))) / dz +         &
-          2.0/3.0*(adcMixing%KspsD(k,iCell) - adcMixing%KspsD(k+1,iCell)) / dz        &
-         + 2.0/3.0*KspsDav*(log(1.0-adcMixing%areaFraction(k,iCell)) -         &
-          log(1.0-adcMixing%areaFraction(k+1,iCell))) /  dz
+        Swup = - 2.0/3.0*(KspsU(k,iCell) - KspsU(k+1,iCell)) / dz &
+           - 2.0/3.0*KspsUav*(log(areaFraction(k,iCell)) -           &
+          log(areaFraction(k+1,iCell))) / dz +         &
+          2.0/3.0*(KspsD(k,iCell) - KspsD(k+1,iCell)) / dz        &
+         + 2.0/3.0*KspsDav*(log(1.0-areaFraction(k,iCell)) -         &
+          log(1.0-areaFraction(k+1,iCell))) /  dz
 
-        adcMixing%w3tend1(k,iCell) = wumdav**3.0*(Eav*(3.0*sigav - 2.0) + Dav*(3.0*sigav - 1.0))
-        adcMixing%w3tend2(k,iCell) =  wumdav**3.0*(6.0*sigav**2.0 - 6.0*sigav + 1)*             &
-              (adcMixing%areaFraction(k,iCell)*(1.0_RKIND - adcMixing%areaFraction(k,iCell))*  &
-              adcMixing%wumd(k,iCell) - adcMixing%areaFraction(k+1,iCell)*(1.0_RKIND - &
-              adcMixing%areaFraction(k+1,iCell))*adcMixing%wumd(k+1,iCell))/dz
-        adcMixing%w3tend3(k,iCell) = -1.5_RKIND*sigav*(1.0_RKIND - sigav)*(1.0_RKIND - 2.0_RKIND*sigav)* &
-              wumdav**2.0_RKIND*((1.0_RKIND - 2.0_RKIND*adcMixing%areaFraction(k,iCell))*      &
-              adcMixing%wumd(k,iCell)**2.0_RKIND - (1.0_RKIND -                                &
-              2.0_RKIND*adcMixing%areaFraction(k+1,iCell))*adcMixing%wumd(k+1,iCell)**2.0_RKIND) / dz
-        adcMixing%w3tend4(k,iCell) = 3.0_RKIND*(1.0_RKIND - 2.0_RKIND*sigav)*Mcav*wumdav*Swup -          &
-              adcMixing%C_mom_w3*KE / (1E-15_RKIND+ sqrt(2.0_RKIND)*lenAv)*adcMixing%w3(i1,k,iCell)
-        adcMixing%w3tend5(k,iCell) = 3.0_RKIND*adcMixing%grav*(alphaT(k,iCell)*adcMixing%w2t(k,iCell) - &
-              betaS(k,iCell)*adcMixing%w2s(k,iCell))*0.9_RKIND
+        w3tend1(k,iCell) = wumdav**3.0*(Eav*(3.0*sigav - 2.0) + Dav*(3.0*sigav - 1.0))
+        w3tend2(k,iCell) =  wumdav**3.0*(6.0*sigav**2.0 - 6.0*sigav + 1)*             &
+              (areaFraction(k,iCell)*(1.0_RKIND - areaFraction(k,iCell))*  &
+              wumd(k,iCell) - areaFraction(k+1,iCell)*(1.0_RKIND - &
+              areaFraction(k+1,iCell))*wumd(k+1,iCell))/dz
+        w3tend3(k,iCell) = -1.5_RKIND*sigav*(1.0_RKIND - sigav)*(1.0_RKIND - 2.0_RKIND*sigav)* &
+              wumdav**2.0_RKIND*((1.0_RKIND - 2.0_RKIND*areaFraction(k,iCell))*      &
+              wumd(k,iCell)**2.0_RKIND - (1.0_RKIND -                                &
+              2.0_RKIND*areaFraction(k+1,iCell))*wumd(k+1,iCell)**2.0_RKIND) / dz
+        w3tend4(k,iCell) = 3.0_RKIND*(1.0_RKIND - 2.0_RKIND*sigav)*Mcav*wumdav*Swup -          &
+              C_mom_w3*KE / (1E-15_RKIND+ sqrt(2.0_RKIND)*lenAv)*w3(i1,k,iCell)
+        w3tend5(k,iCell) = 3.0_RKIND*grav*(alphaT(k,iCell)*w2t(k,iCell) - &
+              betaS(k,iCell)*w2s(k,iCell))*0.9_RKIND
 
-        w3tend(k,iCell) = adcMixing%w3tend1(k,iCell) + adcMixing%w3tend2(k,iCell) + adcMixing%w3tend3(k,iCell) + &
-              adcMixing%w3tend4(k,iCell) + adcMixing%w3tend5(k,iCell)
+        w3tend(k,iCell) = w3tend1(k,iCell) + w3tend2(k,iCell) + w3tend3(k,iCell) + &
+              w3tend4(k,iCell) + w3tend5(k,iCell)
 
         if(k>1 .and. k < nVertLevels) then
-           w3tend(k,iCell) = w3tend(k,iCell) + adcMixing%kappa_w3*(adcMixing%w3(i1,k-1,iCell) &
-              - adcMixing%w3(i1,k+1,iCell)) / (adcMixing%zm(k-1,iCell) - adcMixing%zm(k+1,iCell))**2.0
+           w3tend(k,iCell) = w3tend(k,iCell) + kappa_w3*(w3(i1,k-1,iCell) &
+              - w3(i1,k+1,iCell)) / (zm(k-1,iCell) - zm(k+1,iCell))**2.0
         endif
 
       enddo
@@ -731,72 +722,72 @@ module ocn_adc_mixing
 !        w3(i2,k,iCell) = min(w3(i1,k,iCell) + dt*w3tend(k,iCell),w3check)
 !      enddo
 
-      do k=2,nVertLevels-1
-        dz = (adcMixing%zm(k-1,iCell) - adcMixing%zm(k,iCell))
+      do k=2,nVertLevels
+        dz = (zm(k-1,iCell) - zm(k,iCell))
 
-        sigav = 0.5*(adcMixing%areaFraction(k,iCell) + adcMixing%areaFraction(k-1,iCell))
-        wumdav = 0.5*(adcMixing%wumd(k,iCell) + adcMixing%wumd(k-1,iCell))
-        tumdav = 0.5*(adcMixing%tumd(k,iCell) + adcMixing%tumd(k-1,iCell))
-        sumdav = 0.5*(adcMixing%sumd(k,iCell) + adcMixing%sumd(k-1,iCell))
-        KspsUav = 0.5*(adcMixing%KspsU(k,iCell) + adcMixing%KspsU(k-1,iCell))
-        KspsDav = 0.5*(adcMixing%KspsD(k,iCell) + adcMixing%KspsD(k-1,iCell))
-        Mcav = 0.5*(adcMixing%Mc(k,iCell) + adcMixing%Mc(k-1,iCell))
+        sigav = 0.5*(areaFraction(k,iCell) + areaFraction(k-1,iCell))
+        wumdav = 0.5*(wumd(k,iCell) + wumd(k-1,iCell))
+        tumdav = 0.5*(tumd(k,iCell) + tumd(k-1,iCell))
+        sumdav = 0.5*(sumd(k,iCell) + sumd(k-1,iCell))
+        KspsUav = 0.5*(KspsU(k,iCell) + KspsU(k-1,iCell))
+        KspsDav = 0.5*(KspsD(k,iCell) + KspsD(k-1,iCell))
+        Mcav = 0.5*(Mc(k,iCell) + Mc(k-1,iCell))
 
-        sigavp1 = 0.5*(adcMixing%areaFraction(k,iCell) + adcMixing%areaFraction(k+1,iCell))
-        KspsUavp1 = 0.5*(adcMixing%KspsU(k,iCell) + adcMixing%KspsU(k+1,iCell))
-        KspsDavp1 = 0.5*(adcMixing%KspsD(k,iCell) + adcMixing%KspsD(k+1,iCell))
+        sigavp1 = 0.5*(areaFraction(k,iCell) + areaFraction(k+1,iCell))
+        KspsUavp1 = 0.5*(KspsU(k,iCell) + KspsU(k+1,iCell))
+        KspsDavp1 = 0.5*(KspsD(k,iCell) + KspsD(k+1,iCell))
 
         Uz = (uvel(k-1,iCell) - uvel(k,iCell)) / dz
         Vz = (vvel(k-1,iCell) - vvel(k,iCell)) / dz
 
-        KEsps = adcMixing%areaFraction(k,iCell)*adcMixing%KspsU(k,iCell) +  &
-                  (1.0_RKIND-adcMixing%areaFraction(k,iCell))*adcMixing%KspsD(k,iCell)
-        KE = sqrt((adcMixing%u2(i1,k,iCell) + adcMixing%v2(i1,k,iCell) + adcMixing%w2(i1,k,iCell)) + 0.0*KEsps)
-        Swup = adcMixing%grav*alphaT(k,iCell)*adcMixing%tumd(k,iCell) - adcMixing%grav*        &
-          betaS(k,iCell)*adcMixing%sumd(k,iCell) - 2.0_RKIND/3.0_RKIND*(1.0_RKIND/        &
-          adcMixing%areaFraction(k,iCell)*(sigAv*KspsUav - sigavp1*KspsUavp1) / dz -     &
-          1.0_RKIND/(1.0_RKIND - adcMixing%areaFraction(k,iCell))*((1.0_RKIND - sigav)* &
+        KEsps = areaFraction(k,iCell)*KspsU(k,iCell) +  &
+                  (1.0_RKIND-areaFraction(k,iCell))*KspsD(k,iCell)
+        KE = sqrt((u2(i1,k,iCell) + v2(i1,k,iCell) + w2(i1,k,iCell)) + 0.0*KEsps)
+        Swup = grav*alphaT(k,iCell)*tumd(k,iCell) - grav*        &
+          betaS(k,iCell)*sumd(k,iCell) - 2.0_RKIND/3.0_RKIND*(1.0_RKIND/        &
+          areaFraction(k,iCell)*(sigAv*KspsUav - sigavp1*KspsUavp1) / dz -     &
+          1.0_RKIND/(1.0_RKIND - areaFraction(k,iCell))*((1.0_RKIND - sigav)* &
           KspsDav - (1.0 - sigavp1)*KspsDavp1) / dz)
 
-        adcMixing%w2tend1(k,iCell) = -adcMixing%wumd(k,iCell)**2.0_RKIND*(         &
-          adcMixing%Entrainment(k,iCell) + adcMixing%Detrainment(k,iCell))
-        adcMixing%w2tend2(k,iCell) = -(adcMixing%w3(i2,k-1,iCell) - adcMixing%w3(i2,k,iCell)) / dz
-        adcMixing%w2tend3(k,iCell) = -adcMixing%C_1*KE / (1.0E-15_RKIND + sqrt(2.0_RKIND)* &
-          adcMixing%length(k,iCell))*(adcMixing%w2(i1,k,iCell) - KE**2.0_RKIND/3.0_RKIND)
-        adcMixing%w2tend4(k,iCell) = 2.0_RKIND*adcMixing%Mc(k,iCell)*Swup + 4.0_RKIND / &
-          3.0_RKIND*adcMixing%C_2*adcMixing%areaFraction(k,iCell)*(1.0_RKIND -          &
-          adcMixing%areaFraction(k,iCell))*adcMixing%wumd(k,iCell)*(adcMixing%grav*     &
-          alphaT(k,iCell)*adcMixing%tumd(k,iCell) - adcMixing%grav*betaS(k,iCell)*      &
-          adcMixing%sumd(k,iCell))
-        adcMixing%w2tend5(k,iCell) = (1.0_RKIND/3.0_RKIND*adcMixing%alpha1 -            &
-          adcMixing%alpha2)*(adcMixing%uw(i1,k,iCell)*Uz + adcMixing%vw(i1,k,iCell)*Vz)
+        w2tend1(k,iCell) = -wumd(k,iCell)**2.0_RKIND*(         &
+          Entrainment(k,iCell) + Detrainment(k,iCell))
+        w2tend2(k,iCell) = -(w3(i2,k-1,iCell) - w3(i2,k,iCell)) / dz
+        w2tend3(k,iCell) = -C_1*KE / (1.0E-15_RKIND + sqrt(2.0_RKIND)* &
+          length(k,iCell))*(w2(i1,k,iCell) - KE**2.0_RKIND/3.0_RKIND)
+        w2tend4(k,iCell) = 2.0_RKIND*Mc(k,iCell)*Swup + 4.0_RKIND / &
+          3.0_RKIND*C_2*areaFraction(k,iCell)*(1.0_RKIND -          &
+          areaFraction(k,iCell))*wumd(k,iCell)*(grav*     &
+          alphaT(k,iCell)*tumd(k,iCell) - grav*betaS(k,iCell)*      &
+          sumd(k,iCell))
+        w2tend5(k,iCell) = (1.0_RKIND/3.0_RKIND*alpha1 -            &
+          alpha2)*(uw(i1,k,iCell)*Uz + vw(i1,k,iCell)*Vz)
 
-        w2tend(k,iCell) = adcMixing%w2tend1(k,iCell) + adcMixing%w2tend2(k,iCell) + &
-          adcMixing%w2tend3(k,iCell) + adcMixing%w2tend4(k,iCell) + adcMixing%w2tend5(k,iCell)
+        w2tend(k,iCell) = w2tend1(k,iCell) + w2tend2(k,iCell) + &
+          w2tend3(k,iCell) + w2tend4(k,iCell) + w2tend5(k,iCell)
     enddo
   end do
 
     do iCell=1,nCells
       do k=2,nVertLevels
-        adcMixing%w2(i2,k,iCell) = adcMixing%w2(i1,k,iCell) + dt*w2tend(k,iCell)
-        if(adcMixing%w2(i2,k,iCell) < 0.0_RKIND) then
-          adcMixing%w2cliptend(k,iCell) = -adcMixing%w2(i2,k,iCell)
-          adcMixing%w2(i2,k,iCell) = 0.0_RKIND
+        w2(i2,k,iCell) = w2(i1,k,iCell) + dt*w2tend(k,iCell)
+        if(w2(i2,k,iCell) < 0.0_RKIND) then
+          w2cliptend(k,iCell) = -w2(i2,k,iCell)
+          w2(i2,k,iCell) = 0.0_RKIND
         endif
 
-        if(abs(adcMixing%w2(i2,k,iCell)) > 1.0_RKIND) then
+        if(abs(w2(i2,k,iCell)) > 1.0_RKIND) then
           call mpas_log_write("ERROR: w2 out of range, w2 = %r, location = $i, $i", &
-            MPAS_LOG_CRIT,realArgs=(/adcMixing%w2(i2,k,iCell)/),intArgs=(/k,iCell/))
+            MPAS_LOG_CRIT,realArgs=(/w2(i2,k,iCell)/),intArgs=(/k,iCell/))
         endif
       end do
 
       do k=1,nVertLevels
-        w3check = (adcMixing%w2(i2,k,iCell) + adcMixing%w2(i2,k+1,iCell))**1.5
-        adcMixing%w3(i2,k,iCell) = min(adcMixing%w3(i1,k,iCell) + dt*w3tend(k,iCell),w3check)
+        w3check = (w2(i2,k,iCell) + w2(i2,k+1,iCell))**1.5
+        w3(i2,k,iCell) = min(w3(i1,k,iCell) + dt*w3tend(k,iCell),w3check)
 
-        if(abs(adcMixing%w3(i2,k,iCell)) > 1.0_RKIND) then
+        if(abs(w3(i2,k,iCell)) > 1.0_RKIND) then
           call mpas_log_write("ERROR: w3 out of range, w2 = %r, location = $i, $i", &
-            MPAS_LOG_CRIT,realArgs=(/adcMixing%w3(i2,k,iCell)/),intArgs=(/k,iCell/))
+            MPAS_LOG_CRIT,realArgs=(/w3(i2,k,iCell)/),intArgs=(/k,iCell/))
         endif
       enddo
     enddo
@@ -818,16 +809,16 @@ module ocn_adc_mixing
       do k = 1,nVertLevels
         utemp = uvel(k,iCell)
         vtemp = vvel(k,iCell)
-        uvel(k,iCell) = uvel(k,iCell) - dt*(adcMixing%uw(i2,k,iCell) - adcMixing%uw(i2,k+1,iCell)) /  &
-                  (adcMixing%ze(k,iCell) - adcMixing%ze(k+1,iCell)) !+ dt*fCell(iCell)*vtemp
+        uvel(k,iCell) = uvel(k,iCell) - dt*(uw(i2,k,iCell) - uw(i2,k+1,iCell)) /  &
+                  (ze(k,iCell) - ze(k+1,iCell)) !+ dt*fCell(iCell)*vtemp
 
-        vvel(k,iCell) = vvel(k,iCell) - dt*(adcMixing%vw(i2,k,iCell) - adcMixing%vw(i2,k+1,iCell)) /  &
-                  (adcMixing%ze(k,iCell) - adcMixing%ze(k+1,iCell)) !- dt*fCell(iCell)*utemp
+        vvel(k,iCell) = vvel(k,iCell) - dt*(vw(i2,k,iCell) - vw(i2,k+1,iCell)) /  &
+                  (ze(k,iCell) - ze(k+1,iCell)) !- dt*fCell(iCell)*utemp
 
-        activeTracers(1,k,iCell) = activeTracers(1,k,iCell) - dt*(adcMixing%wt(i2,k,iCell) - &
-          adcMixing%wt(i2,k+1,iCell)) / (adcMixing%ze(k,iCell) - adcMixing%ze(k+1,iCell))
-        activeTracers(2,k,iCell) = activeTracers(2,k,iCell) - dt*(adcMixing%ws(i2,k,iCell) - &
-          adcMixing%ws(i2,k+1,iCell)) / (adcMixing%ze(k,iCell) - adcMixing%ze(k+1,iCell))
+        activeTracers(1,k,iCell) = activeTracers(1,k,iCell) - dt*(wt(i2,k,iCell) - &
+          wt(i2,k+1,iCell)) / (ze(k,iCell) - ze(k+1,iCell))
+        activeTracers(2,k,iCell) = activeTracers(2,k,iCell) - dt*(ws(i2,k,iCell) - &
+          ws(i2,k+1,iCell)) / (ze(k,iCell) - ze(k+1,iCell))
       enddo
     enddo
 
@@ -853,6 +844,7 @@ module ocn_adc_mixing
 
     i1 = 1
     i2 = 2
+    print *, 'niter = ',niter
 !    call construct_depth_coordinate(ssh,layerThick,nCells,nVertLevels)
     do iIter=1,niter
       call build_diagnostic_arrays(nCells,nVertLevels,BVF,wtsfc,wssfc,  &
@@ -863,9 +855,9 @@ module ocn_adc_mixing
       call build_areaFraction_updraft_properties(nCells, nVertLevels)
       call calc_scalar_updraft_properties(nCells, nVertLevels,wtsfc, wssfc, &
                                 alphaT, betaS, boundaryLayerDepth, i2)
-      call calc_subplume_fluxes(nCells,nVertLevels,activeTracers,uvel,vvel, BVF,alphaT,betaS,dt_small)
+                              call calc_subplume_fluxes(nCells,nVertLevels,activeTracers,uvel,vvel, BVF,alphaT,betaS,dt_small)
 !      call build_dissipation_lengths(nCells,nVertLevels,BVF)
-      call dissipation_lengths2(nCells,nVertLevels,activeTracers,alphaT,betaS)
+call dissipation_lengths2(nCells,nVertLevels,activeTracers,alphaT,betaS)
       call update_mean_fields(dt_small,nCells,nVertLevels, 2, uvel,vvel,activeTracers,fCell)
       call swap_time_levels
     enddo

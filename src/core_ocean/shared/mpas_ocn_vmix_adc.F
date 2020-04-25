@@ -296,17 +296,17 @@ contains
 
          vw_sfc(iCell) = stressMeridional(iCell) / rho_sw
 
-         adcMixing % ze(1,iCell) = 0.0_RKIND
-         adcMixing % zm(1,iCell) = -layerThickness(1,iCell)/2.0_RKIND
+         ze(1,iCell) = 0.0_RKIND
+         zm(1,iCell) = -layerThickness(1,iCell)/2.0_RKIND
          do k=2,maxLevelCell(iCell)
-            adcMixing % ze(k,iCell) = adcMixing % ze(k-1,iCell) - layerThickness(k-1,iCell)
-            adcMixing % zm(k,iCell) = adcMixing % ze(k, iCell) - layerThickness(k,iCell)/2.0_RKIND
+            ze(k,iCell) = ze(k-1,iCell) - layerThickness(k-1,iCell)
+            zm(k,iCell) = ze(k, iCell) - layerThickness(k,iCell)/2.0_RKIND
          enddo
          k = maxLevelCell(iCell)+1
-         adcMixing % ze(k,iCell) = adcMixing % ze(k-1,iCell) - layerThickness(k-1,iCell)
+         ze(k,iCell) = ze(k-1,iCell) - layerThickness(k-1,iCell)
          do k = maxLevelCell(iCell) + 1, nVertLevels
-            adcMixing % ze(k+1,iCell) = adcMixing % ze(maxLevelCell(iCell)+1,iCell)
-            adcMixing % zm(k,iCell) = adcMixing % ze(maxLevelCell(iCell)+1,iCell)
+            ze(k+1,iCell) = ze(maxLevelCell(iCell)+1,iCell)
+            zm(k,iCell) = ze(maxLevelCell(iCell)+1,iCell)
          enddo
 
      enddo
@@ -352,7 +352,7 @@ contains
       implicit none
 
       type (domain_type), intent(inout) :: domain !< Input/Output: domain information
-      type (mpas_pool_type), pointer :: meshPool
+      type (mpas_pool_type), pointer :: meshPool, statePool
       type (block_type), pointer :: block
       type (MPAS_TimeInterval_type) :: timeStep
       integer, intent(out) :: err !< Output: error flag
@@ -364,7 +364,7 @@ contains
       real(KIND=RKIND) :: dt, numiterations
       real, dimension(:,:), pointer :: KspsU, KspsD, w2New, sigma, tumd, sumd,  wumd, uwNew, &
             vwNew, u2New, v2New, uvNew, utNew, vtNew, vsNew, usNew, length, w2Cur, uwCur,    &
-            vwCur, u2Cur, v2Cur, uvCur, utCur, vtCur, vsCur, usCur
+            vwCur, u2Cur, v2Cur, uvCur, utCur, vtCur, vsCur, usCur, layerThickness
 
       !
       ! assume no errors during initialization and set to 1 when error is encountered
@@ -404,31 +404,39 @@ contains
       do while (associated(block))
 
          call mpas_pool_get_subpool(block % structs, 'mesh', meshPool)
+         call mpas_pool_get_subpool(block % structs, 'state', statePool)
 
+         call mpas_pool_get_array(statePool, 'layerThickness', layerThickness)
          call mpas_pool_get_dimension(meshPool, 'nVertLevels', nVertLevels)
          call mpas_pool_get_dimension(meshPool, 'nCellsArray', nCellsArray)
          nCells = nCellsArray( size(nCellsArray) )
          do iCell = 1, nCells
-            do k = 1, nVertLevels
-               adcMixing%KspsU(k,iCell) = adcMixing%epsilon
-               adcMixing%KspsD(k,iCell) = adcMixing%epsilon
-               adcMixing%w2(:,k,iCell) = 0.0_RKIND
-               adcMixing%areaFraction(k,iCell) = 0.5_RKIND
-               adcMixing%tumd(k,iCell) = 0.0_RKIND
-               adcMixing%sumd(k,iCell) = 0.0_RKIND
-               adcMixing%wumd(k,iCell) = 0.0_RKIND
-               adcMixing%uw(:,k,iCell) = 0.0_RKIND
-               adcMixing%vw(:,k,iCell) = 0.0_RKIND
-               adcMixing%u2(:,k,iCell) = 0.0_RKIND
-               adcMixing%v2(:,k,iCell) = 0.0_RKIND
-               adcMixing%uv(:,k,iCell) = 0.0_RKIND
-               adcMixing%ut(:,k,iCell) = 0.0_RKIND
-               adcMixing%vt(:,k,iCell) = 0.0_RKIND
-               adcMixing%wt(:,k,iCell) = 0.0_RKIND
-               adcMixing%us(:,k,iCell) = 0.0_RKIND
-               adcMixing%vs(:,k,iCell) = 0.0_RKIND
-               adcMixing%ws(:,k,iCell) = 0.0_RKIND
+            do k = 1, nVertLevels+1
+               KspsU(k,iCell) = epsilon
+               KspsD(k,iCell) = epsilon
+               w2(:,k,iCell) = 0.0_RKIND
+               areaFraction(k,iCell) = 0.5_RKIND
+               tumd(k,iCell) = 0.0_RKIND
+               sumd(k,iCell) = 0.0_RKIND
+               wumd(k,iCell) = 0.0_RKIND
+               uw(:,k,iCell) = 0.0_RKIND
+               vw(:,k,iCell) = 0.0_RKIND
+               u2(:,k,iCell) = 0.0_RKIND
+               v2(:,k,iCell) = 0.0_RKIND
+               uv(:,k,iCell) = 0.0_RKIND
+               ut(:,k,iCell) = 0.0_RKIND
+               vt(:,k,iCell) = 0.0_RKIND
+               wt(:,k,iCell) = 0.0_RKIND
+               us(:,k,iCell) = 0.0_RKIND
+               vs(:,k,iCell) = 0.0_RKIND
+               ws(:,k,iCell) = 0.0_RKIND
             enddo
+            length(1,iCell) = 0.5_RKIND*layerThickness(1,iCell)
+            do k=2,nVertLevels
+              length(k,iCell) = 0.5_RKIND*(layerThickness(k-1,iCell) + &
+                    layerThickness(k,iCell))
+            enddo
+            length(nVertLevels+1,iCell) = 0.5_RKIND*layerThickness(nVertLevels,iCell)
          enddo
          block => block % next
       enddo
@@ -440,27 +448,27 @@ contains
 
      integer, intent(out) :: ierr
 
-     deallocate(adcMixing%KspsU, adcMixing%KspsD, adcMixing%ze, adcMixing%zm,          &
-                adcMixing%eps, adcMixing%length, adcMixing%lenspsD, adcMixing%lenspsU, &
-                adcMixing%KhU, adcMixing%KhD, adcMixing%KmU, adcMixing%KmD,            &
-                adcMixing%wt_spsU, adcMixing%wt_spsD, adcMixing%ws_spsU, adcMixing%ws_spsD, &
-                adcMixing%uw2, adcMixing%vw2, adcMixing%u2w, adcMixing%v2w, adcMixing%w2t,  &
-                adcMixing%w2s, adcMixing%wts, adcMixing%uvw, adcMixing%uwt, adcMixing%vwt,  &
-                adcMixing%ws2, adcMixing%wt2, adcMixing%areaFraction, adcMixing%Entrainment, &
-                adcMixing%Detrainment, adcMixing%tumd, adcMixing%sumd, adcMixing%wumd,       &
-                adcMixing%w2tend1, adcMixing%w2tend2, adcMixing%w2tend3, adcMixing%w2tend4,  &
-                adcMixing%w2tend5, adcMixing%wttend1, adcMixing%wttend2, adcMixing%wttend3,  &
-                adcMixing%wttend4, adcMixing%wttend5, adcMixing%wstend1, adcMixing%wstend2,  &
-                adcMixing%wstend3, adcMixing%wstend4, adcMixing%wstend5, adcMixing%uwtend1,  &
-                adcMixing%uwtend2, adcMixing%uwtend3, adcMixing%uwtend4, adcMixing%uwtend5,  &
-                adcMixing%vwtend1, adcMixing%vwtend2, adcMixing%vwtend3, adcMixing%vwtend4,  &
-                adcMixing%vwtend5, adcMixing%u2tend1, adcMixing%u2tend2, adcMixing%u2tend3,  &
-                adcMixing%u2tend4, adcMixing%u2tend5, adcMixing%v2tend1, adcMixing%v2tend2,  &
-                adcMixing%v2tend3, adcMixing%v2tend4, adcMixing%v2tend5, adcMixing%u2cliptend, &
-                adcMixing%v2cliptend, adcMixing%w2cliptend, adcMixing%u2, adcMixing%v2,      &
-                adcMixing%w2, adcMixing%wt, adcMixing%ws, adcMixing%uw, adcMixing%vw,        &
-                adcMixing%w3, adcMixing%uv, adcMixing%t2, adcMixing%s2, adcMixing%ut,        &
-                adcMixing%vt, adcMixing%us, adcMixing%vs, adcMixing%ts)
+     deallocate(KspsU, KspsD, ze, zm,          &
+                eps, length, lenspsD, lenspsU, &
+                KhU, KhD, KmU, KmD,            &
+                wt_spsU, wt_spsD, ws_spsU, ws_spsD, &
+                uw2, vw2, u2w, v2w, w2t,  &
+                w2s, wts, uvw, uwt, vwt,  &
+                ws2, wt2, areaFraction, Entrainment, &
+                Detrainment, tumd, sumd, wumd,       &
+                w2tend1, w2tend2, w2tend3, w2tend4,  &
+                w2tend5, wttend1, wttend2, wttend3,  &
+                wttend4, wttend5, wstend1, wstend2,  &
+                wstend3, wstend4, wstend5, uwtend1,  &
+                uwtend2, uwtend3, uwtend4, uwtend5,  &
+                vwtend1, vwtend2, vwtend3, vwtend4,  &
+                vwtend5, u2tend1, u2tend2, u2tend3,  &
+                u2tend4, u2tend5, v2tend1, v2tend2,  &
+                v2tend3, v2tend4, v2tend5, u2cliptend, &
+                v2cliptend, w2cliptend, u2, v2,      &
+                w2, wt, ws, uw, vw,        &
+                w3, uv, t2, s2, ut,        &
+                vt, us, vs, ts)
 
    end subroutine ocn_vmix_adc_finalize
 

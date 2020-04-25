@@ -198,6 +198,10 @@
     <var name="wumd" type="real" dimensions="nVertLevelsP1 nCells Time" units="m/s"
       description="upward moving vertical velocity - downward moving (negative) vertical velocity"
       />
+    <var name="Mc" type="real" dimensions="nVertLevelsP1 nCells Time" units="m/s"
+      description="convective mass flux"
+      />
+
 	</var_struct>
 	<var_struct name="adcTendArrays" time_levs="1" packages="adcMixingPKG">
     <var name="w2tend1" type="real" dimensions="nVertLevelsP1 nCells Time" units="m^2/s^3"

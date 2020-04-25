@@ -40,22 +40,22 @@ module ocn_turbulence
    !
    !----------------------------------------------------------------------------
 
-   type, public :: adcMixingType
+   !type, public :: adcMixingType
 
-   real(kind=RKIND) :: epsilon, &! small value below which w2, v2, u2 cannot go
+   real(kind=RKIND),public :: epsilon, &! small value below which w2, v2, u2 cannot go
                        sigmat, Ko, gamma1, beta5, c1, c2, c8, c10, c11, &
                        alpha1, alpha2, alpha3, B1, Kt, grav, c_1, c_2, c_mom, &
                        c_therm, c_mom_w3, c_pt, c_ps, c_pv, &
                        kappa_FL, kappa_w3, kappa_VAR, Cww_D, Cww_E
 
-   real(kind=RKIND), dimension(:,:), allocatable :: KspsU, KspsD, ze, zm, &
+   real(kind=RKIND),public, dimension(:,:), allocatable :: KspsU, KspsD, ze, zm, &
                        eps, lendn, lenup, length, lenspsD, lenspsU, KhU, KhD, KmU,  &
                        KmD, wt_spsU, wt_spsD, ws_spsU, ws_spsD, uw2,  &
                        vw2, u2w, v2w, w2t, w2s, wts, uvw, uwt, vwt,   &
                        uws, vws, ws2, wt2, areaFraction, Entrainment,        &
                        Detrainment, tumd, sumd, wumd, Mc
 
-   real(kind=RKIND), dimension(:,:), allocatable :: w2tend1, w2tend2,     &
+   real(kind=RKIND), public, dimension(:,:), allocatable :: w2tend1, w2tend2,     &
                        w2tend3, w2tend4, w2tend5, wttend1, wttend2,   &
                        wttend3, wttend4, wttend5, w3tend1, w3tend2,   &
                        w3tend3, w3tend5, w3tend4, wstend1, wstend2,   &
@@ -66,12 +66,12 @@ module ocn_turbulence
                        v2tend3, v2tend4, v2tend5, u2cliptend,         &
                        v2cliptend, w2cliptend
 
-   real(kind=RKIND), dimension(:,:,:), allocatable :: u2, v2, w2, t2, s2, &
+   real(kind=RKIND), public, dimension(:,:,:), allocatable :: u2, v2, w2, t2, s2, &
                        uw, vw, wt, ws, w3, uv, ut, vt, us, vs, ts
 
-   end type adcMixingType
+!   end type adcMixingType
 
-   type (adcMixingType), public :: adcMixing
+   !ntype (adcMixingType), public :: adcMixing
 
    !----------------------------------------------------------------------------
    !
@@ -137,34 +137,34 @@ module ocn_turbulence
       call mpas_pool_get_subpool(block % structs, 'adcDiagnosticArrays', adcDiagnosticsPool)
       call mpas_pool_get_subpool(block % structs, 'adcTendArrays', adcTendPool)
       call mpas_pool_get_subpool(block % structs, 'adcPrognosticArrays', adcPrognosticsPool)
-      adcMixing%sigmat = config_adc_sigmat
-      adcMixing%epsilon = config_adc_epsilon
-      adcMixing%Ko = config_adc_Ko
-      adcMixing%gamma1 = config_adc_gamma1
-      adcMixing%beta5 = config_adc_beta5
-      adcMixing%c1 = 2.88_RKIND
-      adcMixing%c2 = 3.84_RKIND
-      adcMixing%c8 = 3.0_RKIND
-      adcMixing%c10 = 5.0_RKIND
-      adcMixing%c11 = 0.1_RKIND
-      adcMixing%alpha1 = 0.984_RKIND
-      adcMixing%alpha2 = 0.568_RKIND
-      adcMixing%alpha3 = 0.29_RKIND
-      adcMixing%B1 = 16.6_RKIND
-      adcMixing%Kt = 0.4_RKIND
-      adcMixing%c_1 = config_adc_c1
-      adcMixing%c_2 = config_adc_c2
-      adcMixing%c_mom = config_adc_Cmom
-      adcMixing%c_therm = config_adc_Ctherm
-      adcMixing%c_mom_w3 = config_adc_Cmom_w3
-      adcMixing%c_pt = config_adc_cpt
-      adcMixing%c_ps = config_adc_cps
-      adcMixing%c_pv = config_adc_cpv
-      adcMixing%Cww_D = config_adc_CwwD
-      adcMixing%Cww_E = config_adc_CwwE
-      adcMixing%kappa_FL = config_adc_kappaFL
-      adcMixing%kappa_VAR = config_adc_kappaVAR
-      adcMixing%kappa_w3 = config_adc_kappaW3
+      sigmat = config_adc_sigmat
+      epsilon = config_adc_epsilon
+      Ko = config_adc_Ko
+      gamma1 = config_adc_gamma1
+      beta5 = config_adc_beta5
+      c1 = 2.88_RKIND
+      c2 = 3.84_RKIND
+      c8 = 3.0_RKIND
+      c10 = 5.0_RKIND
+      c11 = 0.1_RKIND
+      alpha1 = 0.984_RKIND
+      alpha2 = 0.568_RKIND
+      alpha3 = 0.29_RKIND
+      B1 = 16.6_RKIND
+      Kt = 0.4_RKIND
+      c_1 = config_adc_c1
+      c_2 = config_adc_c2
+      c_mom = config_adc_Cmom
+      c_therm = config_adc_Ctherm
+      c_mom_w3 = config_adc_Cmom_w3
+      c_pt = config_adc_cpt
+      c_ps = config_adc_cps
+      c_pv = config_adc_cpv
+      Cww_D = config_adc_CwwD
+      Cww_E = config_adc_CwwE
+      kappa_FL = config_adc_kappaFL
+      kappa_VAR = config_adc_kappaVAR
+      kappa_w3 = config_adc_kappaW3
 
       call mpas_pool_get_array(adcDiagnosticsPool, 'KspsD', KspsDTmp)
       call mpas_pool_get_array(adcDiagnosticsPool, 'KspsU', KspsUTmp)
@@ -206,65 +206,65 @@ module ocn_turbulence
       call mpas_pool_get_array(adcDiagnosticsPool, 'wumd', wumdTmp)
       call mpas_pool_get_array(adcDiagnosticsPool, 'Mc', McTmp)
 
-      allocate( adcMixing%KspsD( nVertLevelsP1, nCells ), adcMixing%KspsU( nVertLevelsP1, nCells) )
-      allocate( adcMixing%ze( nVertLevelsP1, nCells ), adcMixing%zm( nVertLevels, nCells ))
-      allocate( adcMixing%eps( nVertLevelsP1, nCells ), adcMixing%length( nVertLevelsP1, nCells ))
-      allocate( adcMixing%lendn( nVertLevelsP1, nCells ), adcMixing%lenup( nVertLevelsP1, nCells ))
-      allocate( adcMixing%lenspsU( nVertLevelsP1, nCells), adcMixing%lenspsD( nVertLevelsP1, nCells))
-      allocate( adcMixing%KhU( nVertLevelsP1, nCells), adcMixing%KhD( nVertLevelsP1, nCells))
-      allocate( adcMixing%KmU( nVertLevelsP1, nCells), adcMixing%KmD( nVertLevelsP1, nCells))
-      allocate( adcMixing%wt_spsU( nVertLevelsP1, nCells), adcMixing%wt_spsD( nVertLevelsP1, nCells))
-      allocate( adcMixing%ws_spsU( nVertLevelsP1, nCells), adcMixing%ws_spsD( nVertLevelsP1, nCells))
-      allocate( adcMixing%uw2( nVertLevels, nCells ), adcMixing%vw2( nVertLevels, nCells))
-      allocate( adcMixing%u2w( nVertLevels, nCells ), adcMixing%v2w( nVertLevels, nCells ))
-      allocate( adcMixing%w2t( nVertLevels, nCells ), adcMixing%w2s( nVertLevels, nCells ))
-      allocate( adcMixing%wts( nVertLevels, nCells ), adcMixing%uvw( nVertLevels, nCells ))
-      allocate( adcMixing%uwt( nVertLevels, nCells ), adcMixing%vwt( nVertLevels, nCells ))
-      allocate( adcMixing%uws( nVertLevels, nCells ), adcMixing%vws( nVertLevels, nCells ))
-      allocate( adcMixing%ws2( nVertLevels, nCells ), adcMixing%wt2( nVertLevels, nCells ))
-      allocate( adcMixing%areaFraction( nVertLevelsP1, nCells ))
-      allocate( adcMixing%Entrainment( nVertLevelsP1, nCells ), adcMixing%Detrainment( nVertLevelsP1, nCells ))
-      allocate( adcMixing%tumd( nVertLevelsP1, nCells ), adcMixing%sumd( nVertLevelsP1, nCells ))
-      allocate( adcMixing%wumd( nVertLevelsP1, nCells ), adcMixing%Mc( nVertLevelsP1, nCells ))
+      allocate( KspsD( nVertLevelsP1, nCells ), KspsU( nVertLevelsP1, nCells) )
+      allocate( ze( nVertLevelsP1, nCells ), zm( nVertLevels, nCells ))
+      allocate( eps( nVertLevelsP1, nCells ), length( nVertLevelsP1, nCells ))
+      allocate( lendn( nVertLevelsP1, nCells ), lenup( nVertLevelsP1, nCells ))
+      allocate( lenspsU( nVertLevelsP1, nCells), lenspsD( nVertLevelsP1, nCells))
+      allocate( KhU( nVertLevelsP1, nCells), KhD( nVertLevelsP1, nCells))
+      allocate( KmU( nVertLevelsP1, nCells), KmD( nVertLevelsP1, nCells))
+      allocate( wt_spsU( nVertLevelsP1, nCells), wt_spsD( nVertLevelsP1, nCells))
+      allocate( ws_spsU( nVertLevelsP1, nCells), ws_spsD( nVertLevelsP1, nCells))
+      allocate( uw2( nVertLevels, nCells ), vw2( nVertLevels, nCells))
+      allocate( u2w( nVertLevels, nCells ), v2w( nVertLevels, nCells ))
+      allocate( w2t( nVertLevels, nCells ), w2s( nVertLevels, nCells ))
+      allocate( wts( nVertLevels, nCells ), uvw( nVertLevels, nCells ))
+      allocate( uwt( nVertLevels, nCells ), vwt( nVertLevels, nCells ))
+      allocate( uws( nVertLevels, nCells ), vws( nVertLevels, nCells ))
+      allocate( ws2( nVertLevels, nCells ), wt2( nVertLevels, nCells ))
+      allocate( areaFraction( nVertLevelsP1, nCells ))
+      allocate( Entrainment( nVertLevelsP1, nCells ), Detrainment( nVertLevelsP1, nCells ))
+      allocate( tumd( nVertLevelsP1, nCells ), sumd( nVertLevelsP1, nCells ))
+      allocate( wumd( nVertLevelsP1, nCells ), Mc( nVertLevelsP1, nCells ))
 
-      adcMixing%KspsD = KspsDTmp
-      adcMixing%KspsU = KspsUTmp
-      adcMixing%ze = zeTmp
-      adcMixing%zm = zmTmp
-      adcMixing%eps = epsTmp
-      adcMixing%length = lengthTmp
-      adcMixing%lenup = lenupTmp
-      adcMixing%lendn = lendnTmp
-      adcMixing%lenspsD = lenspsDTmp
-      adcMixing%lenspsU = lenspsUTmp
-      adcMixing%KhU = KhUTmp
-      adcMixing%KhD = KhDTmp
-      adcMixing%KmU = KmUTmp
-      adcMixing%KmD = KmDTmp
-      adcMixing%wt_spsU = wt_spsUTmp
-      adcMixing%wt_spsD = wt_spsDTmp
-      adcMixing%ws_spsU = ws_spsUTmp
-      adcMixing%ws_spsD = ws_spsDTmp
-      adcMixing%uw2 = uw2Tmp
-      adcMixing%vw2 = vw2Tmp
-      adcMixing%u2w = u2wTmp
-      adcMixing%v2w = v2wTmp
-      adcMixing%w2t = w2tTmp
-      adcMixing%w2s = w2sTmp
-      adcMixing%wts = wtsTmp
-      adcMixing%uvw = uvwTmp
-      adcMixing%uwt = uwtTmp
-      adcMixing%vwt = vwtTmp
-      adcMixing%uws = uwsTmp
-      adcMixing%vws = vwsTmp
-      adcMixing%ws2 = ws2Tmp
-      adcMixing%wt2 = wt2Tmp
-      adcMixing%areaFraction = areaFractionTmp
-      adcMixing%Entrainment = EntrainmentTmp
-      adcMixing%Detrainment = DetrainmentTmp
-      adcMixing%tumd = tumdTmp
-      adcMixing%sumd = sumdTmp
-      adcMixing%wumd = wumdTmp
+      KspsD = KspsDTmp
+      KspsU = KspsUTmp
+      ze = zeTmp
+      zm = zmTmp
+      eps = epsTmp
+      length = lengthTmp
+      lenup = lenupTmp
+      lendn = lendnTmp
+      lenspsD = lenspsDTmp
+      lenspsU = lenspsUTmp
+      KhU = KhUTmp
+      KhD = KhDTmp
+      KmU = KmUTmp
+      KmD = KmDTmp
+      wt_spsU = wt_spsUTmp
+      wt_spsD = wt_spsDTmp
+      ws_spsU = ws_spsUTmp
+      ws_spsD = ws_spsDTmp
+      uw2 = uw2Tmp
+      vw2 = vw2Tmp
+      u2w = u2wTmp
+      v2w = v2wTmp
+      w2t = w2tTmp
+      w2s = w2sTmp
+      wts = wtsTmp
+      uvw = uvwTmp
+      uwt = uwtTmp
+      vwt = vwtTmp
+      uws = uwsTmp
+      vws = vwsTmp
+      ws2 = ws2Tmp
+      wt2 = wt2Tmp
+      areaFraction = areaFractionTmp
+      Entrainment = EntrainmentTmp
+      Detrainment = DetrainmentTmp
+      tumd = tumdTmp
+      sumd = sumdTmp
+      wumd = wumdTmp
 
       call mpas_pool_get_array(adcTendPool, 'w2tend1', w2tend1Tmp)
       call mpas_pool_get_array(adcTendPool, 'w2tend2', w2tend2Tmp)
@@ -310,93 +310,93 @@ module ocn_turbulence
       call mpas_pool_get_array(adcTendPool, 'v2cliptend', v2cliptendTmp)
       call mpas_pool_get_array(adcTendPool, 'w2cliptend', w2cliptendTmp)
 
-      allocate( adcMixing%w2tend1( nVertLevelsP1, nCells ))
-      allocate( adcMixing%w2tend2( nVertLevelsP1, nCells ))
-      allocate( adcMixing%w2tend3( nVertLevelsP1, nCells ))
-      allocate( adcMixing%w2tend4( nVertLevelsP1, nCells ))
-      allocate( adcMixing%w2tend5( nVertLevelsP1, nCells ))
-      allocate( adcMixing%wttend1( nVertLevelsP1, nCells ))
-      allocate( adcMixing%wttend2( nVertLevelsP1, nCells ))
-      allocate( adcMixing%wttend3( nVertLevelsP1, nCells ))
-      allocate( adcMixing%wttend4( nVertLevelsP1, nCells ))
-      allocate( adcMixing%wttend5( nVertLevelsP1, nCells ))
-      allocate( adcMixing%wstend1( nVertLevelsP1, nCells ))
-      allocate( adcMixing%wstend2( nVertLevelsP1, nCells ))
-      allocate( adcMixing%wstend3( nVertLevelsP1, nCells ))
-      allocate( adcMixing%wstend4( nVertLevelsP1, nCells ))
-      allocate( adcMixing%wstend5( nVertLevelsP1, nCells ))
-      allocate( adcMixing%uwtend1( nVertLevelsP1, nCells ))
-      allocate( adcMixing%uwtend2( nVertLevelsP1, nCells ))
-      allocate( adcMixing%uwtend3( nVertLevelsP1, nCells ))
-      allocate( adcMixing%uwtend4( nVertLevelsP1, nCells ))
-      allocate( adcMixing%uwtend5( nVertLevelsP1, nCells ))
-      allocate( adcMixing%vwtend1( nVertLevelsP1, nCells ))
-      allocate( adcMixing%vwtend2( nVertLevelsP1, nCells ))
-      allocate( adcMixing%vwtend3( nVertLevelsP1, nCells ))
-      allocate( adcMixing%vwtend4( nVertLevelsP1, nCells ))
-      allocate( adcMixing%vwtend5( nVertLevelsP1, nCells ))
-      allocate( adcMixing%v2tend1( nVertLevelsP1, nCells ))
-      allocate( adcMixing%v2tend2( nVertLevelsP1, nCells ))
-      allocate( adcMixing%v2tend3( nVertLevelsP1, nCells ))
-      allocate( adcMixing%v2tend4( nVertLevelsP1, nCells ))
-      allocate( adcMixing%v2tend5( nVertLevelsP1, nCells ))
-      allocate( adcMixing%u2tend1( nVertLevelsP1, nCells ))
-      allocate( adcMixing%u2tend2( nVertLevelsP1, nCells ))
-      allocate( adcMixing%u2tend3( nVertLevelsP1, nCells ))
-      allocate( adcMixing%u2tend4( nVertLevelsP1, nCells ))
-      allocate( adcMixing%u2tend5( nVertLevelsP1, nCells ))
-      allocate( adcMixing%w3tend1( nVertLevels, nCells ))
-      allocate( adcMixing%w3tend2( nVertLevels, nCells ))
-      allocate( adcMixing%w3tend3( nVertLevels, nCells ))
-      allocate( adcMixing%w3tend4( nVertLevels, nCells ))
-      allocate( adcMixing%w3tend5( nVertLevels, nCells ))
-      allocate( adcMixing%u2cliptend( nVertLevelsP1, nCells ))
-      allocate( adcMixing%v2cliptend( nVertLevelsP1, nCells ))
-      allocate( adcMixing%w2cliptend( nVertLevelsP1, nCells ))
+      allocate( w2tend1( nVertLevelsP1, nCells ))
+      allocate( w2tend2( nVertLevelsP1, nCells ))
+      allocate( w2tend3( nVertLevelsP1, nCells ))
+      allocate( w2tend4( nVertLevelsP1, nCells ))
+      allocate( w2tend5( nVertLevelsP1, nCells ))
+      allocate( wttend1( nVertLevelsP1, nCells ))
+      allocate( wttend2( nVertLevelsP1, nCells ))
+      allocate( wttend3( nVertLevelsP1, nCells ))
+      allocate( wttend4( nVertLevelsP1, nCells ))
+      allocate( wttend5( nVertLevelsP1, nCells ))
+      allocate( wstend1( nVertLevelsP1, nCells ))
+      allocate( wstend2( nVertLevelsP1, nCells ))
+      allocate( wstend3( nVertLevelsP1, nCells ))
+      allocate( wstend4( nVertLevelsP1, nCells ))
+      allocate( wstend5( nVertLevelsP1, nCells ))
+      allocate( uwtend1( nVertLevelsP1, nCells ))
+      allocate( uwtend2( nVertLevelsP1, nCells ))
+      allocate( uwtend3( nVertLevelsP1, nCells ))
+      allocate( uwtend4( nVertLevelsP1, nCells ))
+      allocate( uwtend5( nVertLevelsP1, nCells ))
+      allocate( vwtend1( nVertLevelsP1, nCells ))
+      allocate( vwtend2( nVertLevelsP1, nCells ))
+      allocate( vwtend3( nVertLevelsP1, nCells ))
+      allocate( vwtend4( nVertLevelsP1, nCells ))
+      allocate( vwtend5( nVertLevelsP1, nCells ))
+      allocate( v2tend1( nVertLevelsP1, nCells ))
+      allocate( v2tend2( nVertLevelsP1, nCells ))
+      allocate( v2tend3( nVertLevelsP1, nCells ))
+      allocate( v2tend4( nVertLevelsP1, nCells ))
+      allocate( v2tend5( nVertLevelsP1, nCells ))
+      allocate( u2tend1( nVertLevelsP1, nCells ))
+      allocate( u2tend2( nVertLevelsP1, nCells ))
+      allocate( u2tend3( nVertLevelsP1, nCells ))
+      allocate( u2tend4( nVertLevelsP1, nCells ))
+      allocate( u2tend5( nVertLevelsP1, nCells ))
+      allocate( w3tend1( nVertLevels, nCells ))
+      allocate( w3tend2( nVertLevels, nCells ))
+      allocate( w3tend3( nVertLevels, nCells ))
+      allocate( w3tend4( nVertLevels, nCells ))
+      allocate( w3tend5( nVertLevels, nCells ))
+      allocate( u2cliptend( nVertLevelsP1, nCells ))
+      allocate( v2cliptend( nVertLevelsP1, nCells ))
+      allocate( w2cliptend( nVertLevelsP1, nCells ))
 
-      adcMixing%w2tend1 = w2tend1Tmp
-      adcMixing%w2tend2 = w2tend2Tmp
-      adcMixing%w2tend3 = w2tend3Tmp
-      adcMixing%w2tend4 = w2tend4Tmp
-      adcMixing%w2tend5 = w2tend5Tmp
-      adcMixing%w3tend1 = w3tend1Tmp
-      adcMixing%w3tend2 = w3tend2Tmp
-      adcMixing%w3tend3 = w3tend3Tmp
-      adcMixing%w3tend4 = w3tend4Tmp
-      adcMixing%w3tend5 = w3tend5Tmp
-      adcMixing%wttend1 = wttend1Tmp
-      adcMixing%wttend2 = wttend2Tmp
-      adcMixing%wttend3 = wttend3Tmp
-      adcMixing%wttend4 = wttend4Tmp
-      adcMixing%wttend5 = wttend5Tmp
-      adcMixing%wstend1 = wstend1Tmp
-      adcMixing%wstend2 = wstend2Tmp
-      adcMixing%wstend3 = wstend3Tmp
-      adcMixing%wstend4 = wstend4Tmp
-      adcMixing%wstend5 = wstend5Tmp
-      adcMixing%uwtend1 = uwtend1Tmp
-      adcMixing%uwtend2 = uwtend2Tmp
-      adcMixing%uwtend3 = uwtend3Tmp
-      adcMixing%uwtend4 = uwtend4Tmp
-      adcMixing%uwtend5 = uwtend5Tmp
-      adcMixing%vwtend1 = vwtend1Tmp
-      adcMixing%vwtend2 = vwtend2Tmp
-      adcMixing%vwtend3 = vwtend3Tmp
-      adcMixing%vwtend4 = vwtend4Tmp
-      adcMixing%vwtend5 = vwtend5Tmp
-      adcMixing%u2tend1 = u2tend1Tmp
-      adcMixing%u2tend2 = u2tend2Tmp
-      adcMixing%u2tend3 = u2tend3Tmp
-      adcMixing%u2tend4 = u2tend4Tmp
-      adcMixing%u2tend5 = u2tend5Tmp
-      adcMixing%v2tend1 = v2tend1Tmp
-      adcMixing%v2tend2 = v2tend2Tmp
-      adcMixing%v2tend3 = v2tend3Tmp
-      adcMixing%v2tend4 = v2tend4Tmp
-      adcMixing%v2tend5 = v2tend5Tmp
-      adcMixing%u2cliptend = u2cliptendTmp
-      adcMixing%v2cliptend = v2cliptendTmp
-      adcMixing%w2cliptend = w2cliptendTmp
+      w2tend1 = w2tend1Tmp
+      w2tend2 = w2tend2Tmp
+      w2tend3 = w2tend3Tmp
+      w2tend4 = w2tend4Tmp
+      w2tend5 = w2tend5Tmp
+      w3tend1 = w3tend1Tmp
+      w3tend2 = w3tend2Tmp
+      w3tend3 = w3tend3Tmp
+      w3tend4 = w3tend4Tmp
+      w3tend5 = w3tend5Tmp
+      wttend1 = wttend1Tmp
+      wttend2 = wttend2Tmp
+      wttend3 = wttend3Tmp
+      wttend4 = wttend4Tmp
+      wttend5 = wttend5Tmp
+      wstend1 = wstend1Tmp
+      wstend2 = wstend2Tmp
+      wstend3 = wstend3Tmp
+      wstend4 = wstend4Tmp
+      wstend5 = wstend5Tmp
+      uwtend1 = uwtend1Tmp
+      uwtend2 = uwtend2Tmp
+      uwtend3 = uwtend3Tmp
+      uwtend4 = uwtend4Tmp
+      uwtend5 = uwtend5Tmp
+      vwtend1 = vwtend1Tmp
+      vwtend2 = vwtend2Tmp
+      vwtend3 = vwtend3Tmp
+      vwtend4 = vwtend4Tmp
+      vwtend5 = vwtend5Tmp
+      u2tend1 = u2tend1Tmp
+      u2tend2 = u2tend2Tmp
+      u2tend3 = u2tend3Tmp
+      u2tend4 = u2tend4Tmp
+      u2tend5 = u2tend5Tmp
+      v2tend1 = v2tend1Tmp
+      v2tend2 = v2tend2Tmp
+      v2tend3 = v2tend3Tmp
+      v2tend4 = v2tend4Tmp
+      v2tend5 = v2tend5Tmp
+      u2cliptend = u2cliptendTmp
+      v2cliptend = v2cliptendTmp
+      w2cliptend = w2cliptendTmp
 
       call mpas_pool_get_array(adcPrognosticsPool, 'u2', u2Tmp, 1)
       call mpas_pool_get_array(adcPrognosticsPool, 'v2', v2Tmp, 1)
@@ -415,39 +415,39 @@ module ocn_turbulence
       call mpas_pool_get_array(adcPrognosticsPool, 'ts', tsTmp, 1)
       call mpas_pool_get_array(adcPrognosticsPool, 's2', s2Tmp, 1)
 
-      allocate( adcMixing%u2( 2, nVertLevelsP1, nCells ) )
-      allocate( adcMixing%v2( 2, nVertLevelsP1, nCells ) )
-      allocate( adcMixing%w2( 2, nVertLevelsP1, nCells ) )
-      allocate( adcMixing%wt( 2, nVertLevelsP1, nCells ) )
-      allocate( adcMixing%ws( 2, nVertLevelsP1, nCells ) )
-      allocate( adcMixing%uw( 2, nVertLevelsP1, nCells ) )
-      allocate( adcMixing%vw( 2, nVertLevelsP1, nCells ) )
-      allocate( adcMixing%w3( 2, nVertLevels, nCells ) )
-      allocate( adcMixing%uv( 2, nVertLevelsP1, nCells ) )
-      allocate( adcMixing%t2( 2, nVertLevelsP1, nCells ) )
-      allocate( adcMixing%ut( 2, nVertLevelsP1, nCells ) )
-      allocate( adcMixing%vt( 2, nVertLevelsP1, nCells ) )
-      allocate( adcMixing%us( 2, nVertLevelsP1, nCells ) )
-      allocate( adcMixing%vs( 2, nVertLevelsP1, nCells ) )
-      allocate( adcMixing%ts( 2, nVertLevelsP1, nCells ) )
-      allocate( adcMixing%s2( 2, nVertLevelsP1, nCells ) )
+      allocate( u2( 2, nVertLevelsP1, nCells ) )
+      allocate( v2( 2, nVertLevelsP1, nCells ) )
+      allocate( w2( 2, nVertLevelsP1, nCells ) )
+      allocate( wt( 2, nVertLevelsP1, nCells ) )
+      allocate( ws( 2, nVertLevelsP1, nCells ) )
+      allocate( uw( 2, nVertLevelsP1, nCells ) )
+      allocate( vw( 2, nVertLevelsP1, nCells ) )
+      allocate( w3( 2, nVertLevels, nCells ) )
+      allocate( uv( 2, nVertLevelsP1, nCells ) )
+      allocate( t2( 2, nVertLevelsP1, nCells ) )
+      allocate( ut( 2, nVertLevelsP1, nCells ) )
+      allocate( vt( 2, nVertLevelsP1, nCells ) )
+      allocate( us( 2, nVertLevelsP1, nCells ) )
+      allocate( vs( 2, nVertLevelsP1, nCells ) )
+      allocate( ts( 2, nVertLevelsP1, nCells ) )
+      allocate( s2( 2, nVertLevelsP1, nCells ) )
 
-      adcMixing%u2(1,:,:) = u2Tmp(:,:nCells)
-      adcMixing%v2(1,:,:) = v2Tmp(:,:nCells)
-      adcMixing%w2(1,:,:) = w2Tmp(:,:nCells)
-      adcMixing%wt(1,:,:) = wtTmp(:,:nCells)
-      adcMixing%ws(1,:,:) = wsTmp(:,:nCells)
-      adcMixing%uw(1,:,:) = uwTmp(:,:nCells)
-      adcMixing%vw(1,:,:) = vwTmp(:,:nCells)
-      adcMixing%w3(1,:,:) = w3Tmp(:,:nCells)
-      adcMixing%uv(1,:,:) = uvTmp(:,:nCells)
-      adcMixing%t2(1,:,:) = t2Tmp(:,:nCells)
-      adcMixing%ut(1,:,:) = utTmp(:,:nCells)
-      adcMixing%vt(1,:,:) = vtTmp(:,:nCells)
-      adcMixing%us(1,:,:) = usTmp(:,:nCells)
-      adcMixing%vs(1,:,:) = vsTmp(:,:nCells)
-      adcMixing%ts(1,:,:) = tsTmp(:,:nCells)
-      adcMixing%s2(1,:,:) = s2Tmp(:,:nCells)
+      u2(1,:,:) = u2Tmp(:,:nCells)
+      v2(1,:,:) = v2Tmp(:,:nCells)
+      w2(1,:,:) = w2Tmp(:,:nCells)
+      wt(1,:,:) = wtTmp(:,:nCells)
+      ws(1,:,:) = wsTmp(:,:nCells)
+      uw(1,:,:) = uwTmp(:,:nCells)
+      vw(1,:,:) = vwTmp(:,:nCells)
+      w3(1,:,:) = w3Tmp(:,:nCells)
+      uv(1,:,:) = uvTmp(:,:nCells)
+      t2(1,:,:) = t2Tmp(:,:nCells)
+      ut(1,:,:) = utTmp(:,:nCells)
+      vt(1,:,:) = vtTmp(:,:nCells)
+      us(1,:,:) = usTmp(:,:nCells)
+      vs(1,:,:) = vsTmp(:,:nCells)
+      ts(1,:,:) = tsTmp(:,:nCells)
+      s2(1,:,:) = s2Tmp(:,:nCells)
 
       call mpas_pool_get_array(adcPrognosticsPool, 'u2', u2Tmp, 2)
       call mpas_pool_get_array(adcPrognosticsPool, 'v2', v2Tmp, 2)
@@ -466,22 +466,22 @@ module ocn_turbulence
       call mpas_pool_get_array(adcPrognosticsPool, 'ts', tsTmp, 2)
       call mpas_pool_get_array(adcPrognosticsPool, 's2', s2Tmp, 2)
 
-      adcMixing%u2(2,:,:) = u2Tmp(:,:nCells)
-      adcMixing%v2(2,:,:) = v2Tmp(:,:nCells)
-      adcMixing%w2(2,:,:) = w2Tmp(:,:nCells)
-      adcMixing%wt(2,:,:) = wtTmp(:,:nCells)
-      adcMixing%ws(2,:,:) = wsTmp(:,:nCells)
-      adcMixing%uw(2,:,:) = uwTmp(:,:nCells)
-      adcMixing%vw(2,:,:) = vwTmp(:,:nCells)
-      adcMixing%w3(2,:,:) = w3Tmp(:,:nCells)
-      adcMixing%uv(2,:,:) = uvTmp(:,:nCells)
-      adcMixing%t2(2,:,:) = t2Tmp(:,:nCells)
-      adcMixing%ut(2,:,:) = utTmp(:,:nCells)
-      adcMixing%vt(2,:,:) = vtTmp(:,:nCells)
-      adcMixing%us(2,:,:) = usTmp(:,:nCells)
-      adcMixing%vs(2,:,:) = vsTmp(:,:nCells)
-      adcMixing%ts(2,:,:) = tsTmp(:,:nCells)
-      adcMixing%s2(2,:,:) = s2Tmp(:,:nCells)
+      u2(2,:,:) = u2Tmp(:,:nCells)
+      v2(2,:,:) = v2Tmp(:,:nCells)
+      w2(2,:,:) = w2Tmp(:,:nCells)
+      wt(2,:,:) = wtTmp(:,:nCells)
+      ws(2,:,:) = wsTmp(:,:nCells)
+      uw(2,:,:) = uwTmp(:,:nCells)
+      vw(2,:,:) = vwTmp(:,:nCells)
+      w3(2,:,:) = w3Tmp(:,:nCells)
+      uv(2,:,:) = uvTmp(:,:nCells)
+      t2(2,:,:) = t2Tmp(:,:nCells)
+      ut(2,:,:) = utTmp(:,:nCells)
+      vt(2,:,:) = vtTmp(:,:nCells)
+      us(2,:,:) = usTmp(:,:nCells)
+      vs(2,:,:) = vsTmp(:,:nCells)
+      ts(2,:,:) = tsTmp(:,:nCells)
+      s2(2,:,:) = s2Tmp(:,:nCells)
       block => block % next
    end do
 !   at end could do a copy to accelerator
@@ -499,132 +499,132 @@ module ocn_turbulence
      integer, intent(inout) :: ierr
 !   deallocate stuff, set integers and constants to zero, nullify stuff on gpu
 
-      adcMixing%sigmat = 0.0_RKIND
-      adcMixing%epsilon = 0.0_RKIND
-      adcMixing%Ko = 0.0_RKIND
-      adcMixing%gamma1 = 0.0_RKIND
-      adcMixing%beta5 = 0.0_RKIND
-      adcMixing%c1 = 0.0_RKIND
-      adcMixing%c2 = 0.0_RKIND
-      adcMixing%c8 = 0.0_RKIND
-      adcMixing%c10 = 0.0_RKIND
-      adcMixing%c11 = 0.0_RKIND
-      adcMixing%alpha1 = 0.0_RKIND
-      adcMixing%alpha2 = 0.0_RKIND
-      adcMixing%alpha3 = 0.0_RKIND
-      adcMixing%B1 = 0.0_RKIND
-      adcMixing%Kt = 0.0_RKIND
-      adcMixing%c_1 = 0.0_RKIND
-      adcMixing%c_2 = 0.0_RKIND
-      adcMixing%c_mom = 0.0_RKIND
-      adcMixing%c_therm = 0.0_RKIND
-      adcMixing%c_mom_w3 = 0.0_RKIND
-      adcMixing%c_pt = 0.0_RKIND
-      adcMixing%c_ps = 0.0_RKIND
-      adcMixing%c_pv = 0.0_RKIND
-      adcMixing%Cww_D = 0.0_RKIND
-      adcMixing%Cww_E = 0.0_RKIND
-      adcMixing%kappa_FL = 0.0_RKIND
-      adcMixing%kappa_VAR = 0.0_RKIND
-      adcMixing%kappa_w3 = 0.0_RKIND
+      sigmat = 0.0_RKIND
+      epsilon = 0.0_RKIND
+      Ko = 0.0_RKIND
+      gamma1 = 0.0_RKIND
+      beta5 = 0.0_RKIND
+      c1 = 0.0_RKIND
+      c2 = 0.0_RKIND
+      c8 = 0.0_RKIND
+      c10 = 0.0_RKIND
+      c11 = 0.0_RKIND
+      alpha1 = 0.0_RKIND
+      alpha2 = 0.0_RKIND
+      alpha3 = 0.0_RKIND
+      B1 = 0.0_RKIND
+      Kt = 0.0_RKIND
+      c_1 = 0.0_RKIND
+      c_2 = 0.0_RKIND
+      c_mom = 0.0_RKIND
+      c_therm = 0.0_RKIND
+      c_mom_w3 = 0.0_RKIND
+      c_pt = 0.0_RKIND
+      c_ps = 0.0_RKIND
+      c_pv = 0.0_RKIND
+      Cww_D = 0.0_RKIND
+      Cww_E = 0.0_RKIND
+      kappa_FL = 0.0_RKIND
+      kappa_VAR = 0.0_RKIND
+      kappa_w3 = 0.0_RKIND
 
-      deallocate(adcMixing%KspsD,    &
-                 adcMixing%KspsU,    &
-                 adcMixing%ze,       &
-                 adcMixing%zm,       &
-                 adcMixing%eps,      &
-                 adcMixing%length,   &
-                 adcMixing%lenup,    &
-                 adcMixing%lendn,    &
-                 adcMixing%lenspsD,  &
-                 adcMixing%lenspsU,  &
-                 adcMixing%KhU,      &
-                 adcMixing%KhD,      &
-                 adcMixing%KmU,      &
-                 adcMixing%KmD,      &
-                 adcMixing%wt_spsU,  &
-                 adcMixing%wt_spsD,  &
-                 adcMixing%ws_spsU,  &
-                 adcMixing%ws_spsD,  &
-                 adcMixing%uw2,      &
-                 adcMixing%vw2,      &
-                 adcMixing%u2w,      &
-                 adcMixing%v2w,      &
-                 adcMixing%w2t,      &
-                 adcMixing%w2s,      &
-                 adcMixing%wts,      &
-                 adcMixing%uvw,      &
-                 adcMixing%uwt,      &
-                 adcMixing%vwt,      &
-                 adcMixing%uws,      &
-                 adcMixing%vws,      &
-                 adcMixing%ws2,      &
-                 adcMixing%wt2,      &
-                 adcMixing%areaFraction,    &
-                 adcMixing%Entrainment, &
-                 adcMixing%Detrainment, &
-                 adcMixing%tumd,        &
-                 adcMixing%sumd,        &
-                 adcMixing%wumd,        &
-                 adcMixing%w2tend1,     &
-                 adcMixing%w2tend2,     &
-                 adcMixing%w2tend3,     &
-                 adcMixing%w2tend4,     &
-                 adcMixing%w2tend5,     &
-                 adcMixing%w3tend1,     &
-                 adcMixing%w3tend2,     &
-                 adcMixing%w3tend3,     &
-                 adcMixing%w3tend4,     &
-                 adcMixing%w3tend5,     &
-                 adcMixing%wttend1,     &
-                 adcMixing%wttend2,     &
-                 adcMixing%wttend3,     &
-                 adcMixing%wttend4,     &
-                 adcMixing%wttend5,     &
-                 adcMixing%wstend1,     &
-                 adcMixing%wstend2,     &
-                 adcMixing%wstend3,     &
-                 adcMixing%wstend4,     &
-                 adcMixing%wstend5,     &
-                 adcMixing%uwtend1,     &
-                 adcMixing%uwtend2,     &
-                 adcMixing%uwtend3,     &
-                 adcMixing%uwtend4,     &
-                 adcMixing%uwtend5,     &
-                 adcMixing%vwtend1,     &
-                 adcMixing%vwtend2,     &
-                 adcMixing%vwtend3,     &
-                 adcMixing%vwtend4,     &
-                 adcMixing%vwtend5,     &
-                 adcMixing%u2tend1,     &
-                 adcMixing%u2tend2,     &
-                 adcMixing%u2tend3,     &
-                 adcMixing%u2tend4,     &
-                 adcMixing%u2tend5,     &
-                 adcMixing%v2tend1,     &
-                 adcMixing%v2tend2,     &
-                 adcMixing%v2tend3,     &
-                 adcMixing%v2tend4,     &
-                 adcMixing%v2tend5,     &
-                 adcMixing%u2cliptend,  &
-                 adcMixing%v2cliptend,  &
-                 adcMixing%w2cliptend,  &
-                 adcMixing%u2,          &
-                 adcMixing%v2,          &
-                 adcMixing%w2,          &
-                 adcMixing%wt,          &
-                 adcMixing%ws,          &
-                 adcMixing%uw,          &
-                 adcMixing%vw,          &
-                 adcMixing%w3,          &
-                 adcMixing%uv,          &
-                 adcMixing%t2,          &
-                 adcMixing%ut,          &
-                 adcMixing%vt,          &
-                 adcMixing%us,          &
-                 adcMixing%vs,          &
-                 adcMixing%ts,          &
-                 adcMixing%s2)
+      deallocate(KspsD,    &
+                 KspsU,    &
+                 ze,       &
+                 zm,       &
+                 eps,      &
+                 length,   &
+                 lenup,    &
+                 lendn,    &
+                 lenspsD,  &
+                 lenspsU,  &
+                 KhU,      &
+                 KhD,      &
+                 KmU,      &
+                 KmD,      &
+                 wt_spsU,  &
+                 wt_spsD,  &
+                 ws_spsU,  &
+                 ws_spsD,  &
+                 uw2,      &
+                 vw2,      &
+                 u2w,      &
+                 v2w,      &
+                 w2t,      &
+                 w2s,      &
+                 wts,      &
+                 uvw,      &
+                 uwt,      &
+                 vwt,      &
+                 uws,      &
+                 vws,      &
+                 ws2,      &
+                 wt2,      &
+                 areaFraction,    &
+                 Entrainment, &
+                 Detrainment, &
+                 tumd,        &
+                 sumd,        &
+                 wumd,        &
+                 w2tend1,     &
+                 w2tend2,     &
+                 w2tend3,     &
+                 w2tend4,     &
+                 w2tend5,     &
+                 w3tend1,     &
+                 w3tend2,     &
+                 w3tend3,     &
+                 w3tend4,     &
+                 w3tend5,     &
+                 wttend1,     &
+                 wttend2,     &
+                 wttend3,     &
+                 wttend4,     &
+                 wttend5,     &
+                 wstend1,     &
+                 wstend2,     &
+                 wstend3,     &
+                 wstend4,     &
+                 wstend5,     &
+                 uwtend1,     &
+                 uwtend2,     &
+                 uwtend3,     &
+                 uwtend4,     &
+                 uwtend5,     &
+                 vwtend1,     &
+                 vwtend2,     &
+                 vwtend3,     &
+                 vwtend4,     &
+                 vwtend5,     &
+                 u2tend1,     &
+                 u2tend2,     &
+                 u2tend3,     &
+                 u2tend4,     &
+                 u2tend5,     &
+                 v2tend1,     &
+                 v2tend2,     &
+                 v2tend3,     &
+                 v2tend4,     &
+                 v2tend5,     &
+                 u2cliptend,  &
+                 v2cliptend,  &
+                 w2cliptend,  &
+                 u2,          &
+                 v2,          &
+                 w2,          &
+                 wt,          &
+                 ws,          &
+                 uw,          &
+                 vw,          &
+                 w3,          &
+                 uv,          &
+                 t2,          &
+                 ut,          &
+                 vt,          &
+                 us,          &
+                 vs,          &
+                 ts,          &
+                 s2)
 
    end subroutine ocn_turbulenceDestroy
 
