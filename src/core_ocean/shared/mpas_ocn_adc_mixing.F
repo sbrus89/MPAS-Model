@@ -49,7 +49,7 @@ module ocn_adc_mixing
     do iCell=1,nCells
       maximum = -1.0e-12
       idx = 1
-
+      first = .true.
       do k=1,nVertLevels
 
         if(BVF(k,iCell) > 1.005*maximum .and. first) then
@@ -128,23 +128,34 @@ module ocn_adc_mixing
           ij=k
           lenup(k,i) = 0.0_RKIND
           do while(sumv <= tke(k) .and. ij < nVertLevels+1)
-             sumv = sumv + abs(BupEdge(k) - Bup(ij))*(ze(ij,i)-ze(ij+1,i))**2.0_RKIND/2.0_RKIND
-             lenup(k,i) =  lenup(k,i) + abs(ze(ij,i)-ze(ij+1,i))
+             sumv = sumv + (BupEdge(k) - Bup(ij))*(ze(ij-1,i)-ze(ij,i))
+             lenup(k,i) =  lenup(k,i) + abs(ze(ij-1,i)-ze(ij,i))
              ij = ij + 1
 
              if(sumv > tke(k)) THEN
                 ij = ij - 1
-                sumv = sumv - abs(BupEdge(k) - Bup(ij))*(ze(ij,i)-ze(ij+1,i))**2.0/2.0
+                s1 = sumv
+                z1 = ze(ij,i)
+                zV = ze(ij-1,i)
+
+                sumv = sumv - (BupEdge(k) - Bup(ij))*(ze(ij-1,i)-ze(ij,i))
                 lenup(k,i) = lenup(k,i) - abs(ze(ij,i)-ze(ij+1,i))
-!                lenup(k,i) = max(0.55,lenup(k,i) + abs((z1-zV)/(s1 - sumv)*(tke(k)-sumv)))
-                if(Bup(k-1) - Bup(k) < 0) then
-                        minlen = abs(zm(k-1,i) - zm(k,i))
-                else
-                        minlen = 0.5_RKIND
-                endif
-                lenup(k,i) = max(minlen, lenup(k,i) + sqrt(2.0_RKIND/(1.0E-15 + abs(BupEdge(k) -         &
-                                Bup(ij-1))*(tke(k) - sumv))))
-                exit
+                lenup(k,i) = max(0.55,lenup(k,i) + abs((z1-zV)/(s1 - sumv)*(tke(k)-sumv)))
+            !    if(Bup(k-1) - Bup(k) < 0) then
+            !            minlen = abs(zm(k-1,i) - zm(k,i))
+            !    else
+            !            minlen = 0.5_RKIND
+            !    endif
+            !    if(k==5) then
+            !      print *, 'len pre = ',lenup(k,i)
+            !    endif
+!
+!                lenup(k,i) = max(minlen, lenup(k,i) + tke(k)/(1.0E-15 + sumv - (BupEdge(k) -         &
+!                                Bup(ij))))
+!                              if(k==5) then
+!                                print *, lenup(k,i),minlen, tke(k)
+!                              endif
+                              exit
              endif
 
          end do
@@ -154,25 +165,27 @@ module ocn_adc_mixing
         ij=k
         lendn(k,i) = 0.0_RKIND
         do while(sumv <= tke(k) .and. ij>1)
-           sumv = sumv - (BdoEdge(k) - Bdo(ij-1))*(ze(ij-1,i)-ze(ij,i))**2.0_RKIND/2.0_RKIND
+           sumv = sumv - (BdoEdge(k) - Bdo(ij-1))*(ze(ij-1,i)-ze(ij,i))
            lendn(k,i) = lendn(k,i) + abs(ze(ij-1,i)-ze(ij,i))
            ij = ij - 1
 
            if(sumv > tke(k)) THEN
               ij = ij + 1
-!              s1 = sumv
-!              z1 = zedge(ij,i)
-!              zV = zedge(ij-1,i)
-              sumv = sumv + (BdoEdge(k) - Bdo(ij-1))*(ze(ij-1,i)-ze(ij,i))**2.0_RKIND/2.0_RKIND
+              s1 = sumv
+              z1 = ze(ij,i)
+              zV = ze(ij-1,i)
+              sumv = sumv + (BdoEdge(k) - Bdo(ij-1))*(ze(ij-1,i)-ze(ij,i))
               lendn(k,i) = lendn(k,i) - abs(ze(ij-1,i)-ze(ij,i))
-!              lendown(k) = max(0.55,lendown(k) + abs(-(z1-zV)/(sumv)*(tke(k))))
-                if(Bdo(k-1) - Bdo(k) < 0) then
-                        minlen = abs(zm(k-1,i) - zm(k,i))
-                else
-                        minlen = 0.55_RKIND
-                endif
-               lendn(k,i) = max(minlen,lendn(k,i) + sqrt(2.0/(BdoEdge(k) -  &
-                                Bdo(ij-1))*(tke(k) - sumv)))
+              lendn(k,i) = max(0.55,lendn(k,i) + ((zV-z1)/(s1 - sumv)*(tke(k) - sumv)))
+
+            !    if(Bdo(k-1) - Bdo(k) < 0) then
+            !            minlen = abs(zm(k-1,i) - zm(k,i))
+            !    else
+            !            minlen = 0.55_RKIND
+            !    endif
+
+            !   lendn(k,i) = max(minlen,lendn(k,i) + sqrt(2.0_RKIND/(1.0E-15 + abs(BdoEdge(k) -  &
+            !                    Bdo(ij-1))*(tke(k) - sumv))))
               exit
            endif
         enddo
@@ -189,7 +202,7 @@ module ocn_adc_mixing
 
   subroutine build_dissipation_lengths(nCells,nVertLevels,BVF)
     integer,intent(in) :: nCells, nVertLevels
-    real,dimension(nVertLevels+1,nCells),intent(inout) :: BVF
+    real,dimension(nVertLevels,nCells),intent(inout) :: BVF
 
     real :: l, len1, len2, lenmax, KE, integrandTop, integrandBot
 
@@ -224,6 +237,7 @@ module ocn_adc_mixing
       length(nVertLevels+1,iCell) = 1e-15_RKIND
 !      len(1,iCell) = len(2,iCell) !1e-15
     enddo
+
   end subroutine build_dissipation_lengths
 
   subroutine build_areaFraction_updraft_properties(nCells,nVertLevels)
@@ -278,7 +292,7 @@ module ocn_adc_mixing
 !      wstar = (abs(0.4*boundaryLayerDepth(iCell)*wb))**(1./3.)
 
       if(wb > 0.0) then
-        wb = grav*(alphaT(k,iCell)*wtsfc(iCell) - betaS(k,iCell)*wssfc(iCell))
+        wb = grav*(alphaT(1,iCell)*wtsfc(iCell) - betaS(1,iCell)*wssfc(iCell))
         wstar = (abs(0.4_RKIND*boundaryLayerDepth(iCell)*wb))**(1.0_RKIND/3.0_RKIND)
         w2t(1,iCell) = -0.3_RKIND*wstar * wtsfc(iCell)
         !Below FIXME!
@@ -316,7 +330,7 @@ module ocn_adc_mixing
   real,intent(in) :: dt
   real,dimension(nVertLevels,nCells),intent(in) :: uvel,vvel
   real,dimension(2,nVertLevels,nCells),intent(in) :: activeTracers
-  real,dimension(nVertLevels+1,nCells),intent(in) :: BVF
+  real,dimension(nVertLevels,nCells),intent(in) :: BVF
 
   real,dimension(nVertLevels+1,nCells) :: KspsUtend, KspsDtend
   real :: Uz, Vz, Tz, Sz, B, areaFractionAv,dz,integrandTop,integrandBot, Cval
@@ -335,7 +349,7 @@ module ocn_adc_mixing
     Entrainment(1,iCell) = 0.0_RKIND
     Detrainment(1,iCell) = 0.0_RKIND
 
-    do k = 2,nVertLevels
+    do k = 2,nVertLevels-1
       dz = (zm(k-1,iCell) - zm(k,iCell))
       !need to add length scales for Up and Down
       Tz = (activeTracers(1,k-1,iCell) - activeTracers(1,k,iCell)) / dz
@@ -367,6 +381,8 @@ module ocn_adc_mixing
         areaFraction(k,iCell))*Mc(k,iCell) / ( lenup(k,iCell) + EPSILON )
     enddo
 
+    lenspsU(nVertLevels,iCell) = lenspsU(nVertLevels-1,iCell)
+    lenspsD(nVertLevels,iCell) = lenspsD(nVertLevels-1,iCell)
     do k=2,nVertLevels
       eps(k,iCell) = (0.5_RKIND*(u2(i2,k,iCell) + v2(i2,k,iCell) + &
         w2(i2,k,iCell)))**1.5_RKIND/length(k,iCell)
@@ -377,13 +393,14 @@ module ocn_adc_mixing
       else
         Cval = (0.19_RKIND+0.51_RKIND*lenspsU(k,iCell)/dz)
       endif
+
       KspsUtend(k,iCell) = grav*(alphaT(k,iCell)*wt_spsU(k,iCell) - &
         betaS(k,iCell)*ws_spsU(k,ICell)) + ((KmU(k-1,iCell) +                 &
         KmU(k,iCell))*(KspsU(k-1,iCell) - KspsU(k,iCell)) /         &
         (ze(k-1,iCell) - ze(k,iCell)) - (KmU(k,iCell) +             &
         KmU(k+1,iCell)) * (KspsU(k,iCell) - KspsU(k+1,iCell)) /     &
         (ze(k,iCell) - ze(k+1,iCell))) / dz -                                 &
-        Cval*KspsU(k,iCell)**1.5_RKIND/lenspsU(k,iCell) +                     &
+        Cval*KspsU(k,iCell)**1.5_RKIND/(1.0E-15 + lenspsU(k,iCell)) +                     &
         eps(k,iCell) / (2.0_RKIND*areaFraction(k,iCell))
 
       if(k==2) then
@@ -469,6 +486,7 @@ module ocn_adc_mixing
         !PDF formulation will allow for fairly easy generalization of vertical tracer fluxes to
         !all tracers, write in tumd, sumd, wumd form, not sure how to do horizontal fluxes though
         wttend1(k,iCell) = -(w2t(k-1,iCell) - w2t(k,iCell)) / dzmid
+
         wttend2(k,iCell) = -w2(i1,k,iCell)*(activeTracers(1,k-1,iCell) &
           - activeTracers(1,k,iCell)) / dzmid
         wttend3(k,iCell) = (1.0_RKIND - gamma1)*grav*(alphaT(k,iCell) &
@@ -608,22 +626,22 @@ module ocn_adc_mixing
         ws(i2,k,iCell) = (ws(i1,k,iCell) + dt*wstend(k,iCell)) / &
           (1.0_RKIND + dt*taups(k,iCell))
         if(abs(wt(i2,k,iCell)) > 1.0_RKIND) then
-          call mpas_log_write("ERROR: wt out of range, wt = %r, location = $i, $i", &
+          call mpas_log_write("ERROR: wt out of range, wt = $r, location = $i, $i", &
             MPAS_LOG_CRIT,realArgs=(/wt(i2,k,iCell)/),intArgs=(/k,iCell/))
         endif
 
         if(abs(ws(i2,k,iCell)) > 1.0_RKIND) then
-          call mpas_log_write("ERROR: ws out of range, ws = %r, location = $i, $i", &
+          call mpas_log_write("ERROR: ws out of range, ws = $r, location = $i, $i", &
             MPAS_LOG_CRIT,realArgs=(/ws(i2,k,iCell)/),intArgs=(/k,iCell/))
         endif
 
         if(abs(u2(i2,k,iCell)) > 1.0_RKIND) then
-          call mpas_log_write("ERROR: u2 out of range, u2 = %r, location = $i, $i", &
+          call mpas_log_write("ERROR: u2 out of range, u2 = $r, location = $i, $i", &
             MPAS_LOG_CRIT,realArgs=(/u2(i2,k,iCell)/),intArgs=(/k,iCell/))
         endif
 
         if(abs(v2(i2,k,iCell)) > 1.0_RKIND) then
-          call mpas_log_write("ERROR: v2 out of range, v2 = %r, location = $i, $i", &
+          call mpas_log_write("ERROR: v2 out of range, v2 = $r, location = $i, $i", &
             MPAS_LOG_CRIT,realArgs=(/v2(i2,k,iCell)/),intArgs=(/k,iCell/))
         endif
 
@@ -776,7 +794,7 @@ module ocn_adc_mixing
         endif
 
         if(abs(w2(i2,k,iCell)) > 1.0_RKIND) then
-          call mpas_log_write("ERROR: w2 out of range, w2 = %r, location = $i, $i", &
+          call mpas_log_write("ERROR: w2 out of range, w2 = $r, location = $i, $i", &
             MPAS_LOG_CRIT,realArgs=(/w2(i2,k,iCell)/),intArgs=(/k,iCell/))
         endif
       end do
@@ -786,7 +804,7 @@ module ocn_adc_mixing
         w3(i2,k,iCell) = min(w3(i1,k,iCell) + dt*w3tend(k,iCell),w3check)
 
         if(abs(w3(i2,k,iCell)) > 1.0_RKIND) then
-          call mpas_log_write("ERROR: w3 out of range, w2 = %r, location = $i, $i", &
+          call mpas_log_write("ERROR: w3 out of range, w2 = $r, location = $i, $i", &
             MPAS_LOG_CRIT,realArgs=(/w3(i2,k,iCell)/),intArgs=(/k,iCell/))
         endif
       enddo
@@ -794,7 +812,7 @@ module ocn_adc_mixing
 
   end subroutine predict_turbulent_quantities
 
-  subroutine update_mean_fields(dt,nCells,nVertLevels,numTracers,activeTracers,uvel,vvel,fCell)
+  subroutine update_mean_fields(dt,nCells,nVertLevels,numTracers,uvel, vvel, activeTracers,fCell)
 
     integer,intent(in) :: nCells, nVertLevels, numTracers
     real,dimension(nVertLevels,nCells),intent(out) :: uvel,vvel
@@ -817,7 +835,7 @@ module ocn_adc_mixing
 
         activeTracers(1,k,iCell) = activeTracers(1,k,iCell) - dt*(wt(i2,k,iCell) - &
           wt(i2,k+1,iCell)) / (ze(k,iCell) - ze(k+1,iCell))
-        activeTracers(2,k,iCell) = activeTracers(2,k,iCell) - dt*(ws(i2,k,iCell) - &
+     activeTracers(2,k,iCell) = activeTracers(2,k,iCell) - dt*(ws(i2,k,iCell) - &
           ws(i2,k+1,iCell)) / (ze(k,iCell) - ze(k+1,iCell))
       enddo
     enddo
@@ -834,7 +852,7 @@ module ocn_adc_mixing
     real,dimension(nVertLevels,nCells),intent(inout) :: uvel, vvel, alphaT, betaS
     real,dimension(nCells),intent(in) :: uwsfc, vwsfc, wtsfc, wssfc, fCell
     real,dimension(nCells),intent(inout) :: boundaryLayerDepth
-    real,dimension(nVertLevels+1,nCells),intent(inout) :: BVF
+    real,dimension(nVertLevels,nCells),intent(inout) :: BVF
     integer :: niter, iIter,iCell,k
 
     real :: dt_small
@@ -856,8 +874,8 @@ module ocn_adc_mixing
       call calc_scalar_updraft_properties(nCells, nVertLevels,wtsfc, wssfc, &
                                 alphaT, betaS, boundaryLayerDepth, i2)
                               call calc_subplume_fluxes(nCells,nVertLevels,activeTracers,uvel,vvel, BVF,alphaT,betaS,dt_small)
-!      call build_dissipation_lengths(nCells,nVertLevels,BVF)
-call dissipation_lengths2(nCells,nVertLevels,activeTracers,alphaT,betaS)
+      !call build_dissipation_lengths(nCells,nVertLevels,BVF)
+      call dissipation_lengths2(nCells,nVertLevels,activeTracers,alphaT,betaS)
       call update_mean_fields(dt_small,nCells,nVertLevels, 2, uvel,vvel,activeTracers,fCell)
       call swap_time_levels
     enddo

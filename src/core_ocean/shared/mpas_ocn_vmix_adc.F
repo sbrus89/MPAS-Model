@@ -129,7 +129,7 @@ contains
         maxLevelCell, nEdgesOnCell
 
       real (kind=RKIND), dimension(:), pointer :: &
-        stressX, stressY, stressZ, stressZonal, stressMeridional, fCell, &
+        stressZonal, stressMeridional, fCell, &
         surfaceStress, surfaceStressMagnitude, bottomDepth,  &
         penetrativeTemperatureFlux, angleEdge, surfaceThicknessFlux, &
         surfaceThicknessFluxRunoff, boundaryLayerDepth
@@ -222,9 +222,6 @@ contains
       ! need to use RBFs to get stress at cell centers
       call mpas_pool_get_array(forcingPool, 'windStressZonal', stressZonal)
       call mpas_pool_get_array(forcingPool, 'windStressMeridional', stressMeridional)
-      call mpas_pool_get_array(diagnosticsPool, 'stressX', stressX)
-      call mpas_pool_get_array(diagnosticsPool, 'stressY', stressY)
-      call mpas_pool_get_array(diagnosticsPool, 'stressZ', stressZ)
 
       call mpas_pool_get_array(forcingPool, 'surfaceStress', surfaceStress)
       call mpas_pool_get_array(forcingPool, 'surfaceStressMagnitude', surfaceStressMagnitude)
@@ -314,10 +311,11 @@ contains
      !call the individual ADC function and pass the array members maybe?  probably not
      !this will update T in place, so verify it sends time level n+1
      ntracers = size(activeTracers, dim=1)
-     print *, maxval(inSituSalineContractionCoeff),minval(inSituSalineContractionCoeff)
 
+     print *, shape(activeTracers)
+     print *, shape(BruntVaisalaFreqTop)
      call ADC_main_loop(nCells, nVertLevels, ntracers, dt, activeTracers, velocityZonal, velocityMeridional, &
-          BruntVaisalaFreqTop, uw_sfc, vw_sfc, wt_sfc, ws_sfc, inSituThermalExpansionCoeff,        &
+          BruntVaisalaFreqTop, uw_sfc, vw_sfc, -wt_sfc, ws_sfc, inSituThermalExpansionCoeff,        &
           inSituSalineContractionCoeff, fCell, boundaryLayerDepth)
 
          !--------------------------------------------------------------------
@@ -361,10 +359,9 @@ contains
       integer :: k, iCell, nCells, err_tmp, nEdges
       integer, dimension(:), pointer :: nCellsArray, nEdgesArray
 
+      real(KIND=RKIND),dimension(:,:),pointer :: layerThickness
+
       real(KIND=RKIND) :: dt, numiterations
-      real, dimension(:,:), pointer :: KspsU, KspsD, w2New, sigma, tumd, sumd,  wumd, uwNew, &
-            vwNew, u2New, v2New, uvNew, utNew, vtNew, vsNew, usNew, length, w2Cur, uwCur,    &
-            vwCur, u2Cur, v2Cur, uvCur, utCur, vtCur, vsCur, usCur, layerThickness
 
       !
       ! assume no errors during initialization and set to 1 when error is encountered
@@ -410,6 +407,7 @@ contains
          call mpas_pool_get_dimension(meshPool, 'nVertLevels', nVertLevels)
          call mpas_pool_get_dimension(meshPool, 'nCellsArray', nCellsArray)
          nCells = nCellsArray( size(nCellsArray) )
+print *, nCells, nVertLevels, epsilon
          do iCell = 1, nCells
             do k = 1, nVertLevels+1
                KspsU(k,iCell) = epsilon

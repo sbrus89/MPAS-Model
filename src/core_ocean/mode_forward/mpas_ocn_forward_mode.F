@@ -45,6 +45,7 @@ module ocn_forward_mode
    use ocn_thick_ale
    use ocn_thick_surface_flux
 
+   use ocn_turbulence 
    use ocn_vmix_adc
    use ocn_vel_pressure_grad
    use ocn_vel_vadv
@@ -635,6 +636,10 @@ module ocn_forward_mode
          call mpas_log_write( '   Performing I/O')
 #endif
          call mpas_timer_start('io_write')
+         if ( mpas_stream_mgr_ringing_alarms(domain % streamManager, streamID='adcTurbulenceOutput', &
+             direction=MPAS_STREAM_OUTPUT, ierr=ierr) ) THEN
+             call ocn_turbulenceUpdateFields(domain)
+         endif
          call mpas_stream_mgr_write(domain % streamManager, streamID='output', ierr=ierr)
          call mpas_timer_stop('io_write')
          call mpas_timer_start('reset_io_alarms')
