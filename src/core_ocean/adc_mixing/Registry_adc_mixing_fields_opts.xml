@@ -11,6 +11,10 @@
       description="small value below which KE, u2, w2, v2 is not allowed to go below"
       possible_values="very small numbers 1e-8 to zero"
       />
+    <nml_option name="config_adc_use_single_column" type="logical" default_value=".false." units="unitless"
+      description="if true, ADC code runs on 1 copy and is copied to the others to speed testing"
+      possible_values=".true. or .false."
+      />
 		<nml_option name="config_adc_sigmat" type="real" default_value="0.72" units="unitless"
 			description="sigma_t constant for RANS equations"
 			possible_values="can modify some, but highly recommend not altering"

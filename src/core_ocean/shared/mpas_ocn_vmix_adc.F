@@ -56,6 +56,7 @@ module ocn_vmix_adc
 
    logical :: adcOn
    real (kind=RKIND) :: backgroundVisc, backgroundDiff
+   integer :: local_nCells
    integer, parameter :: num_water_types = 5
    real (kind=RKIND), dimension(num_water_types) ::                       &
       rfac   = (/ 0.58_RKIND, 0.62_RKIND, 0.67_RKIND, 0.77_RKIND, 0.78_RKIND /), &
@@ -135,7 +136,7 @@ contains
         surfaceThicknessFluxRunoff, boundaryLayerDepth
 
       real (kind=RKIND), dimension(:,:), pointer :: &
-        layerThickness, velocityZonal, velocityMeridional, &
+        normalVelocity, layerThickness, velocityZonal, velocityMeridional, &
         tracerGroupSurfaceFlux, tracerGroupSurfaceFluxRunoff, &
         tracerGroupSurfaceFluxRemoved, BruntVaisalaFreqTop,  &
         inSituThermalExpansionCoeff, inSituSalineContractionCoeff
@@ -144,12 +145,12 @@ contains
       integer, pointer :: indexTemperature, indexSalinity
 
       integer :: k, i, iCell, jCell, iNeighbor, iter, timeLevel, kIndexOBL,  &
-            ntracers, kav, iEdge, nCells, nEdges
+            ntracers, kav, iEdge, nCells, nEdges, cell1, cell2
       integer, pointer :: nVertLevels, nVertLevelsP1
       integer, dimension(:), pointer :: nCellsArray, nEdgesArray
-
+      integer, dimension(:,:), pointer :: cellsOnEdge
      real (kind=RKIND), dimension(:), allocatable :: zonalAverage, meridionalAverage, uw_sfc, &
-                           vw_sfc, latVal, ws_sfc, wt_sfc
+                           vw_sfc, ws_sfc, wt_sfc
 
       real (kind=RKIND) :: fac, dep1, dep2, fracAbsorbed, fracAbsorbedRunoff,  &
                            etime
@@ -182,7 +183,8 @@ contains
       call mpas_pool_get_dimension(meshPool, 'nVertLevelsP1', nVertLevelsP1)
       call mpas_pool_get_dimension(meshPool, 'nCellsArray', nCellsArray)
       call mpas_pool_get_dimension(meshPool, 'nEdgesArray', nEdgesArray)
-
+      call mpas_pool_get_array(meshPool, 'cellsOnEdge', cellsOnEdge)
+      call mpas_pool_get_array(meshPool, 'angleEdge', angleEdge)
       call mpas_pool_get_array(meshPool, 'nEdgesOnCell', nEdgesOnCell)
       !
       ! set pointers for fields related to position on sphere
@@ -194,6 +196,7 @@ contains
       call mpas_pool_get_dimension(tracersPool, 'index_temperature', indexTemperature)
       call mpas_pool_get_dimension(tracersPool, 'index_salinity', indexSalinity)
 
+      call mpas_pool_get_array(statePool, 'normalVelocity', normalVelocity, timeLevel)
       call mpas_pool_get_array(tracersSurfaceFluxPool, "activeTracersSurfaceFlux", tracerGroupSurfaceFlux)
       call mpas_pool_get_array(tracersSurfaceFluxPool, "activeTracersSurfaceFluxRunoff", tracerGroupSurfaceFluxRunoff)
       call mpas_pool_get_array(tracersSurfaceFluxPool, "activeTracersSurfaceFluxRemoved", tracerGroupSurfaceFluxRemoved)
@@ -314,10 +317,42 @@ contains
 
      print *, shape(activeTracers)
      print *, shape(BruntVaisalaFreqTop)
-     call ADC_main_loop(nCells, nVertLevels, ntracers, dt, activeTracers, velocityZonal, velocityMeridional, &
+     if ( config_adc_use_single_column ) THEN
+       local_nCells = 1
+     else
+       local_nCells = nCells
+     endif
+
+     call ADC_main_loop(local_nCells, nVertLevels, ntracers, dt, activeTracers, velocityZonal, velocityMeridional, &
           BruntVaisalaFreqTop, uw_sfc, vw_sfc, -wt_sfc, ws_sfc, inSituThermalExpansionCoeff,        &
           inSituSalineContractionCoeff, fCell, boundaryLayerDepth)
 
+        !need to add interpolation back to N. Velocity!
+     if ( config_adc_use_single_column ) THEN
+       !$omp do schedule(runtime)
+       do iCell = 2, nCells
+         activeTracers(:,:,iCell) = activeTracers(:,:,1)
+         velocityZonal(:,iCell) = velocityZonal(:,1)
+         velocityMeridional(:,iCell) = velocityMeridional(:,1)
+       end do
+       !$omp end do
+     end if
+
+     !$omp do schedule(runtime)
+     do iEdge = 1,nEdges
+       cell1 = cellsOnEdge(1,iEdge)
+       cell2 = cellsOnEdge(2,iEdge)
+
+       zonalAverage = 0.5_RKIND*(velocityZonal(:,cell1) + velocityZonal(:,cell2))
+       meridionalAverage = 0.5_RKIND*(velocityMeridional(:,cell1) + velocityMeridional(:,cell2))
+
+       normalVelocity(:,iEdge) = cos(angleEdge(iEdge)) * zonalAverage + sin(angleEdge(iEdge))  &
+                                    * meridionalAverage
+     end do
+     !$omp end do
+
+     deallocate(zonalAverage, meridionalAverage, uw_sfc)
+     deallocate(vw_sfc, ws_sfc, wt_sfc)
          !--------------------------------------------------------------------
 
    end subroutine ocn_vmix_adc_mix!}}}
