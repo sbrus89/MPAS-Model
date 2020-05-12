@@ -7,6 +7,14 @@
 			description="timestep for the turbulence updates and subcycling (now in sec, probably should unify with MPAS later)"
 			possible_values="small positive reals (less than MPAS timestep)"
       />
+    <nml_option name="config_adc_tau_o" type="real" default_value="1800" units="s^{-1}"
+      description="characterstic eddy turnover timescale"
+      possible_values="positive real numbers"
+      />
+    <nml_option name="config_adc_length_multiple" type="real" default_value="2.0" units="unitless"
+      description="value to multiply length scale by"
+      possible_values="small positive real numbers"
+      />
     <nml_option name="config_adc_epsilon" type="real" default_value="1e-8" units="m^2/s^2"
       description="small value below which KE, u2, w2, v2 is not allowed to go below"
       possible_values="very small numbers 1e-8 to zero"
@@ -406,6 +414,8 @@
 			<var name="KspsD"/>
 			<var name="eps"/>
       <var name="length"/>
+      <var name="lendn"/>
+      <var name="lenup"/>
       <var name="lenspsD"/>
       <var name="lenspsU"/>
       <var name="KhU"/>

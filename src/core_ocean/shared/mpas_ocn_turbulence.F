@@ -267,6 +267,7 @@ module ocn_turbulence
       tumd = tumdTmp
       sumd = sumdTmp
       wumd = wumdTmp
+      Mc = McTmp
 
       call mpas_pool_get_array(adcTendPool, 'w2tend1', w2tend1Tmp)
       call mpas_pool_get_array(adcTendPool, 'w2tend2', w2tend2Tmp)
@@ -582,6 +583,7 @@ module ocn_turbulence
       call mpas_pool_get_array(adcDiagnosticsPool, 'wumd', wumdTmp)
       call mpas_pool_get_array(adcDiagnosticsPool, 'Mc', McTmp)
 
+      McTmp = Mc
       KspsDTmp = KspsD
       KspsUTmp = KspsU
       zeTmp = ze

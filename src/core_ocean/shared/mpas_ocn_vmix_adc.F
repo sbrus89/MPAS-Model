@@ -327,6 +327,7 @@ contains
           BruntVaisalaFreqTop, uw_sfc, vw_sfc, -wt_sfc, ws_sfc, inSituThermalExpansionCoeff,        &
           inSituSalineContractionCoeff, fCell, boundaryLayerDepth)
 
+        print *, 'bld = ', boundaryLayerDepth(1)
         !need to add interpolation back to N. Velocity!
      if ( config_adc_use_single_column ) THEN
        !$omp do schedule(runtime)
