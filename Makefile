@@ -99,6 +99,35 @@ pgi:
 	"OPENMP = $(OPENMP)" \
 	"CPPFLAGS = $(MODEL_FORMULATION) -D_MPI" )
 
+pgi-lanl:
+	( $(MAKE) all \
+	"FC_PARALLEL = mpif90" \
+	"CC_PARALLEL = mpicc" \
+	"CXX_PARALLEL = mpicxx" \
+	"FC_SERIAL = pgf90" \
+	"CC_SERIAL = pgcc" \
+	"CXX_SERIAL = pgc++" \
+	"FFLAGS_PROMOTION = -r8" \
+	"FFLAGS_OPT = -fpic -O3 -byteswapio -Mfree" \
+	"CFLAGS_OPT = -O3" \
+	"CXXFLAGS_OPT = -O3" \
+	"LDFLAGS_OPT = -O3" \
+	"FFLAGS_DEBUG = -fpic -O0 -g -Mbounds -Mchkptr -byteswapio -Mfree -Ktrap=divz,fp,inv,ovf -traceback" \
+	"CFLAGS_DEBUG = -O0 -g -traceback" \
+	"CXXFLAGS_DEBUG = -O0 -g -traceback" \
+	"LDFLAGS_DEBUG = -O0 -g -Mbounds -Mchkptr -Ktrap=divz,fp,inv,ovf -traceback" \
+	"FFLAGS_OMP = -mp" \
+  "FFLAGS_ACC = -acc -Mcuda -ta=tesla:cc60" \
+  "CFLAGS_ACC = -acc -Mcuda -ta=tesla:cc60" \
+  "LDFLAGS_ACC = -ta=tesla:cc60,deepcopy -Minfo=accel" \
+  "OPENACC = $(OPENACC)" \
+	"CORE = $(CORE)" \
+	"DEBUG = $(DEBUG)" \
+	"USE_PAPI = $(USE_PAPI)" \
+	"OPENMP = $(OPENMP)" \
+	"CPPFLAGS = $(MODEL_FORMULATION) -D_MPI -DUNDERSCORE" )
+
+
 pgi-nersc:
 	( $(MAKE) all \
 	"FC_PARALLEL = ftn" \
