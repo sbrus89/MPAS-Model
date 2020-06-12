@@ -701,6 +701,20 @@ else
 	OPENMP_MESSAGE="MPAS was built without OpenMP support."
 endif
 
+ifeq "$(OPENACC)" "true"
+        FFLAGS += $(FFLAGS_ACC)
+        CFLAGS += $(CFLAGS_ACC)
+        CXXFLAGS += $(CFLAGS_ACC)
+        override CPPFLAGS += "-DMPAS_OPENACC"
+        LDFLAGS += $(FFLAGS_ACC)
+				LIBS += -L$(CUDA)/lib64 -lcufft
+endif #OPENMP IF
+
+ifeq "$(CVMIX2)" "true"
+	LIBS += -lpgatm -L/autofs/nccs-svm1_sw/summit/gcc/8.1.1/lib64 -lstdc++ -ldl
+
+endif
+
 ifneq ($(wildcard .mpas_core_*), ) # CHECK FOR BUILT CORE
 
 ifneq ($(wildcard .mpas_core_$(CORE)), ) # CHECK FOR SAME CORE AS ATTEMPTED BUILD.
