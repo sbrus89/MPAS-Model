@@ -200,17 +200,22 @@ module ocn_adc_mixing
 
   end subroutine dissipation_lengths2
 
-  subroutine build_dissipation_lengths(nCells,nVertLevels,BVF,boundaryLayerDepth)
+  subroutine build_dissipation_lengths(nCells,nVertLevels,BVF,boundaryLayerDepth,alphaT,betaS, &
+      wtsfc, wssfc)
     integer,intent(in) :: nCells, nVertLevels
+    real,dimension(nVertLevels,nCells),intent(in) :: alphaT, betaS
+    real,dimension(nCells),intent(in) :: wtsfc, wssfc
     real,dimension(nVertLevels,nCells),intent(inout) :: BVF
     real,dimension(nCells) :: boundaryLayerDepth
 
     real :: invLen, l, len1, len2, lenmax, KE, integrandTop, integrandBot
+    real :: len0, len2_1, len2_2, sfcBuoy, lengthT, bvfT
 
     integer :: k,iCell
 
     do iCell=1,nCells
 
+      sfcBuoy = grav*(alphaT(1,iCell)*wtsfc(iCell) - betaS(1,iCell)*wssfc(iCell))
       integrandTop = 0.0
       integrandBot = 0.0
       k=1
@@ -226,10 +231,27 @@ module ocn_adc_mixing
       do k=2,nVertLevels
         KE = 0.5_RKIND*(u2(i2,k,iCell) + v2(i2,k,iCell) + w2(i2,k,iCell))
 
-        length(k,iCell) = config_adc_length_multiple / sqrt(1.0_RKIND / (1.0E-15_RKIND + config_adc_tau_o * sqrt(KE) *  &
-            0.4_RKIND * abs(ze(k,iCell))) + 1.0_RKIND / (1.0E-15_RKIND + config_adc_tau_o * sqrt(KE) &
-            * 0.1 * integrandTop / (integrandBot + 1.0E-10_RKIND)) + &
-            max(1.0E-15_RKIND, BVF(k,iCell)) * 0.01_RKIND / (1.0E-15_RKIND + KE))
+        bvfT = max(BVF(k,iCell),0.0_RKIND)
+        len0 = 0.1_RKIND*integrandTop/(integrandBot + 1.0E-15_RKIND)
+        len1 = len0*(0.4_RKIND*abs(ze(k,iCell)) / (0.4_RKIND*abs(ze(k,iCell)) + len0 + 1.0E-15_RKIND))
+        len2_1 = (0.4_RKIND*sfcBuoy + sqrt((0.4_RKIND*sfcBuoy)**2.0 + 4.0_RKIND*KE**2.0*bvfT)) / &
+                (2.0_RKIND * sqrt(KE) * bvfT + 1.0E-15)
+        len2_2 = (0.4_RKIND*sfcBuoy - sqrt((0.4_RKIND*sfcBuoy)**2.0 + 4.0_RKIND*KE**2.0*bvfT)) / &
+                (2.0_RKIND * sqrt(KE) * bvfT + 1.0E-15)
+        if(len2_2 < 0) len2_2 = 1.0E15_RKIND
+
+        if(ze(k,iCell) < -boundaryLayerDepth(iCell)) THEN
+          lengthT = 1.0_RKIND / len0 + 1.0_RKIND / len1 + 1.0_RKIND / len2_1 + 1.0_RKIND
+        else
+          lengthT = 1.0_RKIND / (sqrt(KE / ((1.0E-15_RKIND + bvfT))) + 1.0E-15_RKIND)
+        endif
+
+        length(k,iCell) = 1.0_RKIND / lengthT
+
+        !  length(k,iCell) = config_adc_length_multiple / sqrt(1.0_RKIND / (1.0E-15_RKIND + config_adc_tau_o * sqrt(KE) *  &
+        !    0.4_RKIND * abs(ze(k,iCell))) + 1.0_RKIND / (1.0E-15_RKIND + config_adc_tau_o * sqrt(KE) &
+        !    * 0.1 * integrandTop / (integrandBot + 1.0E-10_RKIND)) + &
+        !    max(1.0E-15_RKIND, BVF(k,iCell)) * 0.01_RKIND / (1.0E-15_RKIND + KE))
 
 !        if(KE > EPSILON) then
 !          lenmax = 0.53_RKIND*sqrt(2.0_RKIND*KE / (1.0E-15_RKIND + BVF(k,iCell)))
@@ -247,7 +269,7 @@ module ocn_adc_mixing
         endif
       enddo
       length(nVertLevels+1,iCell) = 1e-15_RKIND
-!      len(1,iCell) = len(2,iCell) !1e-1
+      length(1,iCell) = length(2,iCell) !1e-1
     enddo
 
   end subroutine build_dissipation_lengths
@@ -800,9 +822,9 @@ module ocn_adc_mixing
     do iCell=1,nCells
       do k=2,nVertLevels
         w2(i2,k,iCell) = w2(i1,k,iCell) + dt*w2tend(k,iCell)
-        if(w2(i2,k,iCell) < 0.0_RKIND) then
-          w2cliptend(k,iCell) = -w2(i2,k,iCell)
-          w2(i2,k,iCell) = 0.0_RKIND
+        if(w2(i2,k,iCell) < epsilon) then
+          w2cliptend(k,iCell) = epsilon-w2(i2,k,iCell)
+          w2(i2,k,iCell) = epsilon
         endif
 
         if(abs(w2(i2,k,iCell)) > 1.0_RKIND) then
@@ -874,7 +896,6 @@ module ocn_adc_mixing
 
     i1 = 1
     i2 = 2
-    print *, 'niter = ',niter
 !    call construct_depth_coordinate(ssh,layerThick,nCells,nVertLevels)
     do iIter=1,niter
       call build_diagnostic_arrays(nCells,nVertLevels,BVF,wtsfc,wssfc,  &
@@ -886,8 +907,8 @@ module ocn_adc_mixing
       call calc_scalar_updraft_properties(nCells, nVertLevels,wtsfc, wssfc, &
                                 alphaT, betaS, boundaryLayerDepth, i2)
                               call calc_subplume_fluxes(nCells,nVertLevels,activeTracers,uvel,vvel, BVF,alphaT,betaS,dt_small)
-      call build_dissipation_lengths(nCells,nVertLevels,BVF, boundaryLayerDepth)
-      !call dissipation_lengths2(nCells,nVertLevels,activeTracers,alphaT,betaS)
+!      call build_dissipation_lengths(nCells,nVertLevels,BVF, boundaryLayerDepth,alphaT,betaS,wtsfc,wssfc)
+      call dissipation_lengths2(nCells,nVertLevels,activeTracers,alphaT,betaS)
       call update_mean_fields(dt_small,nCells,nVertLevels, 2, uvel,vvel,activeTracers,fCell)
       call swap_time_levels
     enddo

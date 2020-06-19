@@ -315,8 +315,6 @@ contains
      !this will update T in place, so verify it sends time level n+1
      ntracers = size(activeTracers, dim=1)
 
-     print *, shape(activeTracers)
-     print *, shape(BruntVaisalaFreqTop)
      if ( config_adc_use_single_column ) THEN
        local_nCells = 1
      else
@@ -327,7 +325,6 @@ contains
           BruntVaisalaFreqTop, uw_sfc, vw_sfc, -wt_sfc, ws_sfc, inSituThermalExpansionCoeff,        &
           inSituSalineContractionCoeff, fCell, boundaryLayerDepth)
 
-        print *, 'bld = ', boundaryLayerDepth(1)
         !need to add interpolation back to N. Velocity!
      if ( config_adc_use_single_column ) THEN
        !$omp do schedule(runtime)
@@ -443,7 +440,6 @@ contains
          call mpas_pool_get_dimension(meshPool, 'nVertLevels', nVertLevels)
          call mpas_pool_get_dimension(meshPool, 'nCellsArray', nCellsArray)
          nCells = nCellsArray( size(nCellsArray) )
-print *, nCells, nVertLevels, epsilon
          do iCell = 1, nCells
             do k = 1, nVertLevels+1
                KspsU(k,iCell) = epsilon
