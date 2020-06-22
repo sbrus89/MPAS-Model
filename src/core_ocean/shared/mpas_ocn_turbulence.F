@@ -50,7 +50,7 @@ module ocn_turbulence
                        kappa_FL, kappa_w3, kappa_VAR, Cww_D, Cww_E
 
    real(kind=RKIND),public, dimension(:,:), allocatable :: KspsU, KspsD, ze, zm, &
-                       eps, lendn, lenup, length, lenspsD, lenspsU, KhU, KhD, KmU,  &
+                       epsSPS, lendn, lenup, length, lenspsD, lenspsU, KhU, KhD, KmU,  &
                        KmD, wt_spsU, wt_spsD, ws_spsU, ws_spsD, uw2,  &
                        vw2, u2w, v2w, w2t, w2s, wts, uvw, uwt, vwt,   &
                        uws, vws, ws2, wt2, areaFraction, Entrainment,        &
@@ -68,7 +68,7 @@ module ocn_turbulence
                        v2cliptend, w2cliptend
 
    real(kind=RKIND), public, dimension(:,:,:), allocatable :: u2, v2, w2, t2, s2, &
-                       uw, vw, wt, ws, w3, uv, ut, vt, us, vs, ts
+                       uw, vw, wt, ws, w3, uv, ut, vt, us, vs, ts, eps
 
 !   end type adcMixingType
 
@@ -102,7 +102,7 @@ module ocn_turbulence
          adcDiagnosticsPool, adcPrognosticsPool, adcTendPool, meshPool  ! mesh variables in MPAS pool structure
 
    real(kind=RKIND), dimension(:,:), pointer :: KspsUTmp, KspsDTmp, zeTmp, zmTmp, &
-                       epsTmp, lengthTmp, lenspsDTmp, lenspsUTmp, KhUTmp, KhDTmp, KmUTmp,  &
+                       epsSPSTmp, lengthTmp, lenspsDTmp, lenspsUTmp, KhUTmp, KhDTmp, KmUTmp,  &
                        KmDTmp, wt_spsUTmp, wt_spsDTmp, ws_spsUTmp, ws_spsDTmp, uw2Tmp,  &
                        vw2Tmp, u2wTmp, v2wTmp, w2tTmp, w2sTmp, wtsTmp, uvwTmp, uwtTmp, vwtTMP,   &
                        uwsTmp, vwsTmp, ws2Tmp, wt2Tmp, areaFractionTmp, EntrainmentTmp,        &
@@ -121,7 +121,7 @@ module ocn_turbulence
 
    real(kind=RKIND), dimension(:,:), pointer :: u2Tmp, v2Tmp, w2Tmp, t2Tmp, s2Tmp, &
                        uwTmp, vwTmp, wtTmp, wsTmp, w3Tmp, uvTmp, utTmp, vtTmp, usTmp,&
-                       vsTmp, tsTmp
+                       vsTmp, tsTmp, epsTmp
 
    integer, pointer :: nVertLevels, nVertLevelsP1
    integer :: nCells
@@ -172,7 +172,7 @@ module ocn_turbulence
       call mpas_pool_get_array(adcDiagnosticsPool, 'KspsU', KspsUTmp)
       call mpas_pool_get_array(adcDiagnosticsPool, 'ze', zeTmp)
       call mpas_pool_get_array(adcDiagnosticsPool, 'zm', zmTmp)
-      call mpas_pool_get_array(adcDiagnosticsPool, 'eps', epsTmp)
+      call mpas_pool_get_array(adcDiagnosticsPool, 'epsSPS', epsSPSTmp)
       call mpas_pool_get_array(adcDiagnosticsPool, 'length', lengthTmp)
       call mpas_pool_get_array(adcDiagnosticsPool, 'lenup', lenupTmp)
       call mpas_pool_get_array(adcDiagnosticsPool, 'lendn', lendnTmp)
@@ -210,7 +210,7 @@ module ocn_turbulence
 
       allocate( KspsD( nVertLevelsP1, nCells ), KspsU( nVertLevelsP1, nCells) )
       allocate( ze( nVertLevelsP1, nCells ), zm( nVertLevels, nCells ))
-      allocate( eps( nVertLevelsP1, nCells ), length( nVertLevelsP1, nCells ))
+      allocate( epsSPS( nVertLevelsP1, nCells ), length( nVertLevelsP1, nCells ))
       allocate( lendn( nVertLevelsP1, nCells ), lenup( nVertLevelsP1, nCells ))
       allocate( lenspsU( nVertLevelsP1, nCells), lenspsD( nVertLevelsP1, nCells))
       allocate( KhU( nVertLevelsP1, nCells), KhD( nVertLevelsP1, nCells))
@@ -233,7 +233,7 @@ module ocn_turbulence
       KspsU = KspsUTmp
       ze = zeTmp
       zm = zmTmp
-      eps = epsTmp
+      epsSPS = epsSPSTmp
       length = lengthTmp
       lenup = lenupTmp
       lendn = lendnTmp
@@ -417,7 +417,9 @@ module ocn_turbulence
       call mpas_pool_get_array(adcPrognosticsPool, 'vs', vsTmp, 1)
       call mpas_pool_get_array(adcPrognosticsPool, 'ts', tsTmp, 1)
       call mpas_pool_get_array(adcPrognosticsPool, 's2', s2Tmp, 1)
+      call mpas_pool_get_array(adcPrognosticsPool, 'eps', epsTmp, 1)
 
+      allocate( eps( 2, nVertLevelsP1, nCells ) )
       allocate( u2( 2, nVertLevelsP1, nCells ) )
       allocate( v2( 2, nVertLevelsP1, nCells ) )
       allocate( w2( 2, nVertLevelsP1, nCells ) )
@@ -451,6 +453,7 @@ module ocn_turbulence
       vs(1,:,:) = vsTmp(:,:nCells)
       ts(1,:,:) = tsTmp(:,:nCells)
       s2(1,:,:) = s2Tmp(:,:nCells)
+      eps(1,:,:) = epsTmp(:,:nCells)
 
       call mpas_pool_get_array(adcPrognosticsPool, 'u2', u2Tmp, 2)
       call mpas_pool_get_array(adcPrognosticsPool, 'v2', v2Tmp, 2)
@@ -468,7 +471,9 @@ module ocn_turbulence
       call mpas_pool_get_array(adcPrognosticsPool, 'vs', vsTmp, 2)
       call mpas_pool_get_array(adcPrognosticsPool, 'ts', tsTmp, 2)
       call mpas_pool_get_array(adcPrognosticsPool, 's2', s2Tmp, 2)
+      call mpas_pool_get_array(adcPrognosticsPool, 'eps', epsTmp, 2)
 
+      eps(2,:,:) = epsTmp(:,:nCells)
       u2(2,:,:) = u2Tmp(:,:nCells)
       v2(2,:,:) = v2Tmp(:,:nCells)
       w2(2,:,:) = w2Tmp(:,:nCells)
@@ -506,7 +511,7 @@ module ocn_turbulence
          adcDiagnosticsPool, adcPrognosticsPool, adcTendPool, meshPool  ! mesh variables in MPAS pool structure
 
    real(kind=RKIND), dimension(:,:), pointer :: KspsUTmp, KspsDTmp, zeTmp, zmTmp, &
-                       epsTmp, lengthTmp, lenspsDTmp, lenspsUTmp, KhUTmp, KhDTmp, KmUTmp,  &
+                       epsSPSTmp, lengthTmp, lenspsDTmp, lenspsUTmp, KhUTmp, KhDTmp, KmUTmp,  &
                        KmDTmp, wt_spsUTmp, wt_spsDTmp, ws_spsUTmp, ws_spsDTmp, uw2Tmp,  &
                        vw2Tmp, u2wTmp, v2wTmp, w2tTmp, w2sTmp, wtsTmp, uvwTmp, uwtTmp, vwtTMP,   &
                        uwsTmp, vwsTmp, ws2Tmp, wt2Tmp, areaFractionTmp, EntrainmentTmp,        &
@@ -525,7 +530,7 @@ module ocn_turbulence
 
    real(kind=RKIND), dimension(:,:), pointer :: u2Tmp, v2Tmp, w2Tmp, t2Tmp, s2Tmp, &
                        uwTmp, vwTmp, wtTmp, wsTmp, w3Tmp, uvTmp, utTmp, vtTmp, usTmp,&
-                       vsTmp, tsTmp
+                       vsTmp, tsTmp, epsTmp
 
    integer, pointer :: nVertLevels, nVertLevelsP1
    integer :: nCells
@@ -547,7 +552,7 @@ module ocn_turbulence
       call mpas_pool_get_array(adcDiagnosticsPool, 'KspsU', KspsUTmp)
       call mpas_pool_get_array(adcDiagnosticsPool, 'ze', zeTmp)
       call mpas_pool_get_array(adcDiagnosticsPool, 'zm', zmTmp)
-      call mpas_pool_get_array(adcDiagnosticsPool, 'eps', epsTmp)
+      call mpas_pool_get_array(adcDiagnosticsPool, 'epsSPS', epsSPSTmp)
       call mpas_pool_get_array(adcDiagnosticsPool, 'length', lengthTmp)
       call mpas_pool_get_array(adcDiagnosticsPool, 'lenup', lenupTmp)
       call mpas_pool_get_array(adcDiagnosticsPool, 'lendn', lendnTmp)
@@ -588,7 +593,7 @@ module ocn_turbulence
       KspsUTmp = KspsU
       zeTmp = ze
       zmTmp = zm
-      epsTmp = eps
+      epsSPSTmp = epsSPS
       lengthTmp = length
       lenupTmp = lenup
       lendnTmp = lendn
@@ -727,7 +732,9 @@ module ocn_turbulence
       call mpas_pool_get_array(adcPrognosticsPool, 'vs', vsTmp, 1)
       call mpas_pool_get_array(adcPrognosticsPool, 'ts', tsTmp, 1)
       call mpas_pool_get_array(adcPrognosticsPool, 's2', s2Tmp, 1)
+      call mpas_pool_get_array(adcPrognosticsPool, 'eps', epsTmp, 1)
 
+      epsTmp(:,:nCells) = eps(1,:,:nCells)
       u2Tmp(:,:nCells) = u2(1,:,:nCells)
       v2Tmp(:,:nCells) = v2(1,:,:nCells)
       w2Tmp(:,:nCells) = w2(1,:,:nCells)
@@ -761,7 +768,9 @@ module ocn_turbulence
       call mpas_pool_get_array(adcPrognosticsPool, 'vs', vsTmp, 2)
       call mpas_pool_get_array(adcPrognosticsPool, 'ts', tsTmp, 2)
       call mpas_pool_get_array(adcPrognosticsPool, 's2', s2Tmp, 2)
+      call mpas_pool_get_array(adcPrognosticsPool, 'eps', epsTmp, 2)
 
+      epsTmp(:,:nCells) = eps(2,:,:nCells)
       u2Tmp(:,:nCells) = u2(2,:,:nCells)
       v2Tmp(:,:nCells) = v2(2,:,:nCells)
       w2Tmp(:,:nCells) = w2(2,:,:nCells)
@@ -823,7 +832,7 @@ module ocn_turbulence
                  KspsU,    &
                  ze,       &
                  zm,       &
-                 eps,      &
+                 epsSPS,      &
                  length,   &
                  lenup,    &
                  lendn,    &
@@ -915,7 +924,8 @@ module ocn_turbulence
                  us,          &
                  vs,          &
                  ts,          &
-                 s2)
+                 s2,          &
+                 eps)
 
    end subroutine ocn_turbulenceDestroy
 

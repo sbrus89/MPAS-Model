@@ -200,6 +200,64 @@ module ocn_adc_mixing
 
   end subroutine dissipation_lengths2
 
+  subroutine build_length_from_dissipation_eq(nCells,nVertLevels,BVF,boundaryLayerDepth,alphaT,betaS, &
+      uvel, vvel, dt)
+    integer,intent(in) :: nCells, nVertLevels
+    real,dimension(nVertLevels,nCells),intent(in) :: alphaT, betaS, uvel, vvel
+    real,dimension(nVertLevels,nCells),intent(inout) :: BVF
+    real,dimension(nCells) :: boundaryLayerDepth
+    real,intent(in) :: dt
+
+    real :: invLen, l, len1, len2, lenmax, KE, integrandTop, integrandBot
+    real :: len0, len2_1, len2_2, sfcBuoy, lengthT, bvfT
+    real :: KEm1, KEp1, tauUP, tauDN, tomUP, tomDN
+    real :: tauM1, tau, tauP1, tauAV
+    real,dimension(nVertLevels) :: epstend
+
+    integer :: k,iCell
+
+    do iCell=1,nCells
+      epstend(1) = 0.0_RKIND
+      do k=2,nVertLevels
+        KEm1 = 0.5_RKIND*(u2(i1,k-1,iCell) + v2(i1,k-1,iCell) + w2(i1,k-1,iCell))
+        KE = 0.5_RKIND*(u2(i1,k,iCell) + v2(i1,k,iCell) + w2(i1,k,iCell))
+        KEp1 = 0.5_RKIND*(u2(i1,k+1,iCell) + v2(i1,k+1,iCell) + w2(i1,k+1,iCell))
+        tauM1 = 2.0_RKIND*KEm1 / (eps(i1,k-1,iCell) + 1.0E-15_RKIND)
+        tau = 2.0_RKIND*KE / (eps(i1,k,iCell) + 1.0E-15_RKIND)
+        tauP1 = 2.0_RKIND*KEp1 / (eps(i1,k+1,iCell) + 1.0E-15_RKIND)
+        tomUP = u2w(k-1,iCell) + v2w(k-1,iCell) + 0.0_RKIND*w3(i1,k-1,iCell)
+        tomDN = u2w(k,iCell) + v2w(k,iCell) + 0.0_RKIND*w3(i1,k,iCell)
+        tauAV = 0.5_RKIND*(tauUP + tauDN)
+
+        epstend(k) = -0.8_RKIND*((tomUP / (0.5_RKIND*(tauM1 + tau) + 1.0E-10_RKIND) - tomDN / &
+          (0.5_RKIND*(tau + tauP1) + 1.0E-10_RKIND)) / (zm(k-1,iCell) - zm(k,iCell))) - &
+          2.88/(tau + 1.0E-10_RKIND)*uw(i1,k,iCell)*(uvel(k-1,iCell) - uvel(k,iCell)) / &
+          (zm(k-1,iCell) - zm(k,iCell)) - &
+          2.88/(tau + 1.0E-10_RKIND)*vw(i1,k,iCell)*(vvel(k-1,iCell) - vvel(k,iCell)) / &
+          (zm(k-1,iCell) - zm(k,iCell)) + &
+          2.88/(tau + 1.0E-10_RKIND)*grav*(alphaT(k,iCell)*wt(i1,k,iCell) - betaS(k,iCell)* &
+          ws(i1,k,iCell)) - 3.84*eps(i1,k,iCell)/(tau + 1.0E-10_RKIND)
+      enddo
+
+      do k = 1,nVertLevels
+        eps(i2,k,iCell) = eps(i1,k,iCell) + dt*epstend(k)
+        if (eps(i2,k,iCell) < 1.0E-10_RKIND) then
+          eps(i2,k,iCell) = 1.0E-10_RKIND
+        endif
+        KE = 0.5_RKIND*(u2(i2,k,iCell) + v2(i2,k,iCell) + w2(i2,k,iCell))
+        length(k,iCell) = KE**1.5 / eps(i2,k,iCell)
+!        length(k,iCell) = max(length(k,iCell),0.55_RKIND)
+!        if(-ze(k,iCell) > boundaryLayerDepth(iCell)) then
+!          length(k,iCell) = min(length(k,iCell),ze(k,iCell) - ze(k+1,iCell))
+!        endif
+      enddo
+      length(nVertLevels+1,iCell) = 1e-15_RKIND
+      length(1,iCell) = length(2,iCell) !1e-1
+    enddo
+
+  end subroutine build_length_from_dissipation_eq 
+
+
   subroutine build_dissipation_lengths(nCells,nVertLevels,BVF,boundaryLayerDepth,alphaT,betaS, &
       wtsfc, wssfc)
     integer,intent(in) :: nCells, nVertLevels
@@ -239,6 +297,10 @@ module ocn_adc_mixing
         len2_2 = (0.4_RKIND*sfcBuoy - sqrt((0.4_RKIND*sfcBuoy)**2.0 + 4.0_RKIND*KE**2.0*bvfT)) / &
                 (2.0_RKIND * sqrt(KE) * bvfT + 1.0E-15)
         if(len2_2 < 0) len2_2 = 1.0E15_RKIND
+
+        if(k==2) then
+          print *, len0,len1,len2_1,len2_2
+        endif
 
         if(ze(k,iCell) < -boundaryLayerDepth(iCell)) THEN
           lengthT = 1.0_RKIND / len0 + 1.0_RKIND / len1 + 1.0_RKIND / len2_1 + 1.0_RKIND
@@ -418,7 +480,7 @@ module ocn_adc_mixing
     lenspsU(nVertLevels,iCell) = lenspsU(nVertLevels-1,iCell)
     lenspsD(nVertLevels,iCell) = lenspsD(nVertLevels-1,iCell)
     do k=2,nVertLevels
-      eps(k,iCell) = (0.5_RKIND*(u2(i2,k,iCell) + v2(i2,k,iCell) + &
+      epsSPS(k,iCell) = (0.5_RKIND*(u2(i2,k,iCell) + v2(i2,k,iCell) + &
         w2(i2,k,iCell)))**1.5_RKIND/length(k,iCell)
 
       dz = (zm(k-1,iCell) - zm(k,iCell))
@@ -435,7 +497,7 @@ module ocn_adc_mixing
         KmU(k+1,iCell)) * (KspsU(k,iCell) - KspsU(k+1,iCell)) /     &
         (ze(k,iCell) - ze(k+1,iCell))) / dz -                                 &
         Cval*KspsU(k,iCell)**1.5_RKIND/(1.0E-15 + lenspsU(k,iCell)) +                     &
-        eps(k,iCell) / (2.0_RKIND*areaFraction(k,iCell))
+        epsSPS(k,iCell) / (2.0_RKIND*areaFraction(k,iCell))
 
       if(k==2) then
         Cval = 3.96_RKIND
@@ -450,7 +512,7 @@ module ocn_adc_mixing
         KmD(k+1,iCell)) * (KspsD(k,iCell) - KspsD(k+1,iCell)) /     &
         (ze(k,iCell) - ze(k+1,iCell))) / dz -                                 &
         Cval*KspsD(k,iCell)**1.5_RKIND / lenspsD(k,iCell) +                   &
-        eps(k,iCell) / (2.0_RKIND*(1.0_RKIND - areaFraction(k,iCell)))
+        epsSPS(k,iCell) / (2.0_RKIND*(1.0_RKIND - areaFraction(k,iCell)))
     enddo
   enddo
 
@@ -487,8 +549,8 @@ module ocn_adc_mixing
           areaFraction(k,iCell))*KspsD(k,iCell)) + (areaFraction(k+1,iCell)* &
           KspsU(k+1,iCell) + (1.0_RKIND-areaFraction(k+1,iCell))* &
           KspsD(k+1,iCell)))
-        Kps = 0.5_RKIND*(u2(i1,k,iCell) + v2(i1,k,iCell) + w2(i2,k,iCell))
-        Kpsp1 = 0.5_RKIND*(u2(i1,k+1,iCell) + v2(i1,k+1,iCell) + w2(i2,k+1,iCell))
+        Kps = 0.5_RKIND*(u2(i1,k,iCell) + v2(i1,k,iCell) + w2(i1,k,iCell))
+        Kpsp1 = 0.5_RKIND*(u2(i1,k+1,iCell) + v2(i1,k+1,iCell) + w2(i1,k+1,iCell))
         lenav = 0.5_RKIND*(length(k,iCell) + length(k+1,iCell))
         diff = C_mom * sqrt(0.5_RKIND*(Kps + Kpsp1)) / lenav
         dz = ze(k,iCell) - ze(k+1,iCell)
@@ -511,7 +573,7 @@ module ocn_adc_mixing
         Uz = (uvel(k-1,iCell) - uvel(k,iCell)) / dz
         Vz = (vvel(k-1,iCell) - vvel(k,iCell)) / dz
 
-        Kps = sqrt((u2(i1,k,iCell) + v2(i1,k,iCell) + w2(i2,k,iCell)))
+        Kps = sqrt((u2(i1,k,iCell) + v2(i1,k,iCell) + w2(i1,k,iCell)))
         B = grav*(alphaT(k,iCell)*wt(i1,k,iCell) - betaS(k,iCell)*ws(i1,k,iCell))
 
         taupt(k,iCell) = Kps / (sqrt(2.0)*c_pt*length(k,iCell))
@@ -583,7 +645,7 @@ module ocn_adc_mixing
           2.0_RKIND)*uw(i1,k,iCell)*Uz
         u2tend3(k,iCell) = - 2.0_RKIND/3.0_RKIND*alpha1*vw(i1,k,iCell)*Vz
         u2tend4(k,iCell) = 2.0_RKIND/3.0_RKIND*(1.0_RKIND-beta5)*B
-        u2tend5(k,iCell) = -2.0_RKIND/3.0_RKIND*eps(k,iCell) + &
+        u2tend5(k,iCell) = -2.0_RKIND/3.0_RKIND*eps(i1,k,iCell) + &
           taupv(k,iCell)*(Kps**2.0_RKIND/3.0_RKIND - u2(i1,k,iCell))
 
         u2tend(k,iCell) = u2tend1(k,iCell) + u2tend2(k,iCell) + &
@@ -594,7 +656,7 @@ module ocn_adc_mixing
           2.0_RKIND)*vw(i1,k,iCell)*Vz
         v2tend3(k,iCell) = - 2.0_RKIND/3.0_RKIND*alpha1*uw(i1,k,iCell)*Uz
         v2tend4(k,iCell) = 2.0_RKIND/3.0_RKIND*(1-beta5)*B
-        v2tend5(k,iCell) = -2.0_RKIND/3.0_RKIND*eps(k,iCell) + taupv(k,iCell)* &
+        v2tend5(k,iCell) = -2.0_RKIND/3.0_RKIND*eps(i1,k,iCell) + taupv(k,iCell)* &
           (Kps**2/3. - v2(i1,k,iCell))
 
         v2tend(k,iCell) = v2tend1(k,iCell) + v2tend2(k,iCell) + &
@@ -906,9 +968,11 @@ module ocn_adc_mixing
       call build_areaFraction_updraft_properties(nCells, nVertLevels)
       call calc_scalar_updraft_properties(nCells, nVertLevels,wtsfc, wssfc, &
                                 alphaT, betaS, boundaryLayerDepth, i2)
-                              call calc_subplume_fluxes(nCells,nVertLevels,activeTracers,uvel,vvel, BVF,alphaT,betaS,dt_small)
-!      call build_dissipation_lengths(nCells,nVertLevels,BVF, boundaryLayerDepth,alphaT,betaS,wtsfc,wssfc)
-      call dissipation_lengths2(nCells,nVertLevels,activeTracers,alphaT,betaS)
+      call calc_subplume_fluxes(nCells,nVertLevels,activeTracers,uvel,vvel, BVF,alphaT,betaS,dt_small)
+     ! call build_dissipation_lengths(nCells,nVertLevels,BVF, boundaryLayerDepth,alphaT,betaS,wtsfc,wssfc)
+      call build_length_from_dissipation_eq(nCells,nVertLevels,BVF,boundaryLayerDepth,alphaT,betaS, &
+             uvel, vvel, dt)
+      !      call dissipation_lengths2(nCells,nVertLevels,activeTracers,alphaT,betaS)
       call update_mean_fields(dt_small,nCells,nVertLevels, 2, uvel,vvel,activeTracers,fCell)
       call swap_time_levels
     enddo

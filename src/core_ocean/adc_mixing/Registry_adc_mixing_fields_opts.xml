@@ -108,7 +108,7 @@
 		<var name="zm" type="real" dimensions="nVertLevels nCells Time" units="m"
 			 description="depth coordinate at cell mid referenced to zero at SSH"
        />
-    <var name="eps" type="real" dimensions="nVertLevelsP1 nCells Time" units="m^2/s^{-3}"
+    <var name="epsSPS" type="real" dimensions="nVertLevelsP1 nCells Time" units="m^2/s^{-3}"
       description="dissipation of plume scale TKE"
       />
     <var name="length" type="real" dimensions="nVertLevelsP1 nCells Time" units="m"
@@ -347,6 +347,9 @@
     />
 	</var_struct>
   <var_struct name="adcPrognosticArrays" time_levs="2" packages="adcMixingPKG">
+    <var name="eps" type="real" dimensions="nVertLevelsP1 nCells Time" units="m^2/s^3"
+       description="prognostic dissipation rate"
+    />
     <var name="u2" type="real" dimensions="nVertLevelsP1 nCells Time" units="m^2/s^2"
 			 description="EW velocity variance"
 		/>

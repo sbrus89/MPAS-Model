@@ -444,7 +444,7 @@ contains
             do k = 1, nVertLevels+1
                KspsU(k,iCell) = epsilon
                KspsD(k,iCell) = epsilon
-               w2(:,k,iCell) = 0.0_RKIND
+               w2(:,k,iCell) = 1.0E-8_RKIND 
                areaFraction(k,iCell) = 0.5_RKIND
                tumd(k,iCell) = 0.0_RKIND
                sumd(k,iCell) = 0.0_RKIND
@@ -459,6 +459,7 @@ contains
                wt(:,k,iCell) = 0.0_RKIND
                us(:,k,iCell) = 0.0_RKIND
                vs(:,k,iCell) = 0.0_RKIND
+               eps(:,k,iCell) = 1.0E-13_RKIND
                ws(:,k,iCell) = 0.0_RKIND
             enddo
             length(1,iCell) = 0.5_RKIND*layerThickness(1,iCell)
