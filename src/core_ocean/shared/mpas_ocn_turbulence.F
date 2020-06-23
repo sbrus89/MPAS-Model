@@ -494,6 +494,106 @@ module ocn_turbulence
    end do
 !   at end could do a copy to accelerator
 
+      !$acc enter data copyin(KspsD,    &
+      !$acc                  KspsU,    &
+      !$acc                  ze,       &
+      !$acc                  zm,       &
+      !$acc                  epsSPS,      &
+      !$acc                  length,   &
+      !$acc                  lenup,    &
+      !$acc                  lendn,    &
+      !$acc                  lenspsD,  &
+      !$acc                  lenspsU,  &
+      !$acc                  KhU,      &
+      !$acc                  KhD,      &
+      !$acc                  KmU,      &
+      !$acc                  KmD,      &
+      !$acc                  wt_spsU,  &
+      !$acc                  wt_spsD,  &
+      !$acc                  ws_spsU,  &
+      !$acc                  ws_spsD,  &
+      !$acc                  uw2,      &
+      !$acc                  vw2,      &
+      !$acc                  u2w,      &
+      !$acc                  v2w,      &
+      !$acc                  w2t,      &
+      !$acc                  w2s,      &
+      !$acc                  wts,      &
+      !$acc                  uvw,      &
+      !$acc                  uwt,      &
+      !$acc                  vwt,      &
+      !$acc                  uws,      &
+      !$acc                  vws,      &
+      !$acc                  ws2,      &
+      !$acc                  wt2,      &
+      !$acc                  areaFraction,    &
+      !$acc                  Entrainment, &
+      !$acc                  Detrainment, &
+      !$acc                  tumd,        &
+      !$acc                  sumd,        &
+      !$acc                  wumd,        &
+      !$acc                  w2tend1,     &
+      !$acc                  w2tend2,     &
+      !$acc                  w2tend3,     &
+      !$acc                  w2tend4,     &
+      !$acc                  w2tend5,     &
+      !$acc                  w3tend1,     &
+      !$acc                  w3tend2,     &
+      !$acc                  w3tend3,     &
+      !$acc                  w3tend4,     &
+      !$acc                  w3tend5,     &
+      !$acc                  wttend1,     &
+      !$acc                  wttend2,     &
+      !$acc                  wttend3,     &
+      !$acc                  wttend4,     &
+      !$acc                  wttend5,     &
+      !$acc                  wstend1,     &
+      !$acc                  wstend2,     &
+      !$acc                  wstend3,     &
+      !$acc                  wstend4,     &
+      !$acc                  wstend5,     &
+      !$acc                  uwtend1,     &
+      !$acc                  uwtend2,     &
+      !$acc                  uwtend3,     &
+      !$acc                  uwtend4,     &
+      !$acc                  uwtend5,     &
+      !$acc                  vwtend1,     &
+      !$acc                  vwtend2,     &
+      !$acc                  vwtend3,     &
+      !$acc                  vwtend4,     &
+      !$acc                  vwtend5,     &
+      !$acc                  u2tend1,     &
+      !$acc                  u2tend2,     &
+      !$acc                  u2tend3,     &
+      !$acc                  u2tend4,     &
+      !$acc                  u2tend5,     &
+      !$acc                  v2tend1,     &
+      !$acc                  v2tend2,     &
+      !$acc                  v2tend3,     &
+      !$acc                  v2tend4,     &
+      !$acc                  v2tend5,     &
+      !$acc                  u2cliptend,  &
+      !$acc                  v2cliptend,  &
+      !$acc                  w2cliptend,  &
+      !$acc                  u2,          &
+      !$acc                  v2,          &
+      !$acc                  w2,          &
+      !$acc                  wt,          &
+      !$acc                  ws,          &
+      !$acc                  uw,          &
+      !$acc                  vw,          &
+      !$acc                  w3,          &
+      !$acc                  uv,          &
+      !$acc                  t2,          &
+      !$acc                  ut,          &
+      !$acc                  vt,          &
+      !$acc                  us,          &
+      !$acc                  vs,          &
+      !$acc                  ts,          &
+      !$acc                  s2,          &
+      !$acc                  eps)
+
+
    end subroutine ocn_turbulenceCreate
 
    subroutine ocn_turbulenceUpdateFields(domain)
@@ -538,7 +638,110 @@ module ocn_turbulence
 
    block => domain % blocklist
    do while (associated(block))
-      call mpas_pool_get_subpool(block % structs, 'mesh', meshPool)
+      !For runs on device, must update host before write out, could make this list smaller
+      !at some point for production runs
+      !should not ever need an update device no quantities get calculated on host
+
+      !$acc update host(KspsD,    &
+      !$acc                  KspsU,    &
+      !$acc                  ze,       &
+      !$acc                  zm,       &
+      !$acc                  epsSPS,      &
+      !$acc                  length,   &
+      !$acc                  lenup,    &
+      !$acc                  lendn,    &
+      !$acc                  lenspsD,  &
+      !$acc                  lenspsU,  &
+      !$acc                  KhU,      &
+      !$acc                  KhD,      &
+      !$acc                  KmU,      &
+      !$acc                  KmD,      &
+      !$acc                  wt_spsU,  &
+      !$acc                  wt_spsD,  &
+      !$acc                  ws_spsU,  &
+      !$acc                  ws_spsD,  &
+      !$acc                  uw2,      &
+      !$acc                  vw2,      &
+      !$acc                  u2w,      &
+      !$acc                  v2w,      &
+      !$acc                  w2t,      &
+      !$acc                  w2s,      &
+      !$acc                  wts,      &
+      !$acc                  uvw,      &
+      !$acc                  uwt,      &
+      !$acc                  vwt,      &
+      !$acc                  uws,      &
+      !$acc                  vws,      &
+      !$acc                  ws2,      &
+      !$acc                  wt2,      &
+      !$acc                  areaFraction,    &
+      !$acc                  Entrainment, &
+      !$acc                  Detrainment, &
+      !$acc                  tumd,        &
+      !$acc                  sumd,        &
+      !$acc                  wumd,        &
+      !$acc                  w2tend1,     &
+      !$acc                  w2tend2,     &
+      !$acc                  w2tend3,     &
+      !$acc                  w2tend4,     &
+      !$acc                  w2tend5,     &
+      !$acc                  w3tend1,     &
+      !$acc                  w3tend2,     &
+      !$acc                  w3tend3,     &
+      !$acc                  w3tend4,     &
+      !$acc                  w3tend5,     &
+      !$acc                  wttend1,     &
+      !$acc                  wttend2,     &
+      !$acc                  wttend3,     &
+      !$acc                  wttend4,     &
+      !$acc                  wttend5,     &
+      !$acc                  wstend1,     &
+      !$acc                  wstend2,     &
+      !$acc                  wstend3,     &
+      !$acc                  wstend4,     &
+      !$acc                  wstend5,     &
+      !$acc                  uwtend1,     &
+      !$acc                  uwtend2,     &
+      !$acc                  uwtend3,     &
+      !$acc                  uwtend4,     &
+      !$acc                  uwtend5,     &
+      !$acc                  vwtend1,     &
+      !$acc                  vwtend2,     &
+      !$acc                  vwtend3,     &
+      !$acc                  vwtend4,     &
+      !$acc                  vwtend5,     &
+      !$acc                  u2tend1,     &
+      !$acc                  u2tend2,     &
+      !$acc                  u2tend3,     &
+      !$acc                  u2tend4,     &
+      !$acc                  u2tend5,     &
+      !$acc                  v2tend1,     &
+      !$acc                  v2tend2,     &
+      !$acc                  v2tend3,     &
+      !$acc                  v2tend4,     &
+      !$acc                  v2tend5,     &
+      !$acc                  u2cliptend,  &
+      !$acc                  v2cliptend,  &
+      !$acc                  w2cliptend,  &
+      !$acc                  u2,          &
+      !$acc                  v2,          &
+      !$acc                  w2,          &
+      !$acc                  wt,          &
+      !$acc                  ws,          &
+      !$acc                  uw,          &
+      !$acc                  vw,          &
+      !$acc                  w3,          &
+      !$acc                  uv,          &
+      !$acc                  t2,          &
+      !$acc                  ut,          &
+      !$acc                  vt,          &
+      !$acc                  us,          &
+      !$acc                  vs,          &
+      !$acc                  ts,          &
+      !$acc                  s2,          &
+      !$acc                  eps)
+
+     call mpas_pool_get_subpool(block % structs, 'mesh', meshPool)
       call mpas_pool_get_dimension(meshPool, 'nVertLevels', nVertLevels)
       call mpas_pool_get_dimension(meshPool, 'nVertLevelsP1', nVertLevelsP1)
       call mpas_pool_get_dimension(meshPool, 'nCellsArray', nCellsArray)
@@ -827,6 +1030,105 @@ module ocn_turbulence
       kappa_FL = 0.0_RKIND
       kappa_VAR = 0.0_RKIND
       kappa_w3 = 0.0_RKIND
+
+      !$acc exit data delete(KspsD,    &
+      !$acc                  KspsU,    &
+      !$acc                  ze,       &
+      !$acc                  zm,       &
+      !$acc                  epsSPS,      &
+      !$acc                  length,   &
+      !$acc                  lenup,    &
+      !$acc                  lendn,    &
+      !$acc                  lenspsD,  &
+      !$acc                  lenspsU,  &
+      !$acc                  KhU,      &
+      !$acc                  KhD,      &
+      !$acc                  KmU,      &
+      !$acc                  KmD,      &
+      !$acc                  wt_spsU,  &
+      !$acc                  wt_spsD,  &
+      !$acc                  ws_spsU,  &
+      !$acc                  ws_spsD,  &
+      !$acc                  uw2,      &
+      !$acc                  vw2,      &
+      !$acc                  u2w,      &
+      !$acc                  v2w,      &
+      !$acc                  w2t,      &
+      !$acc                  w2s,      &
+      !$acc                  wts,      &
+      !$acc                  uvw,      &
+      !$acc                  uwt,      &
+      !$acc                  vwt,      &
+      !$acc                  uws,      &
+      !$acc                  vws,      &
+      !$acc                  ws2,      &
+      !$acc                  wt2,      &
+      !$acc                  areaFraction,    &
+      !$acc                  Entrainment, &
+      !$acc                  Detrainment, &
+      !$acc                  tumd,        &
+      !$acc                  sumd,        &
+      !$acc                  wumd,        &
+      !$acc                  w2tend1,     &
+      !$acc                  w2tend2,     &
+      !$acc                  w2tend3,     &
+      !$acc                  w2tend4,     &
+      !$acc                  w2tend5,     &
+      !$acc                  w3tend1,     &
+      !$acc                  w3tend2,     &
+      !$acc                  w3tend3,     &
+      !$acc                  w3tend4,     &
+      !$acc                  w3tend5,     &
+      !$acc                  wttend1,     &
+      !$acc                  wttend2,     &
+      !$acc                  wttend3,     &
+      !$acc                  wttend4,     &
+      !$acc                  wttend5,     &
+      !$acc                  wstend1,     &
+      !$acc                  wstend2,     &
+      !$acc                  wstend3,     &
+      !$acc                  wstend4,     &
+      !$acc                  wstend5,     &
+      !$acc                  uwtend1,     &
+      !$acc                  uwtend2,     &
+      !$acc                  uwtend3,     &
+      !$acc                  uwtend4,     &
+      !$acc                  uwtend5,     &
+      !$acc                  vwtend1,     &
+      !$acc                  vwtend2,     &
+      !$acc                  vwtend3,     &
+      !$acc                  vwtend4,     &
+      !$acc                  vwtend5,     &
+      !$acc                  u2tend1,     &
+      !$acc                  u2tend2,     &
+      !$acc                  u2tend3,     &
+      !$acc                  u2tend4,     &
+      !$acc                  u2tend5,     &
+      !$acc                  v2tend1,     &
+      !$acc                  v2tend2,     &
+      !$acc                  v2tend3,     &
+      !$acc                  v2tend4,     &
+      !$acc                  v2tend5,     &
+      !$acc                  u2cliptend,  &
+      !$acc                  v2cliptend,  &
+      !$acc                  w2cliptend,  &
+      !$acc                  u2,          &
+      !$acc                  v2,          &
+      !$acc                  w2,          &
+      !$acc                  wt,          &
+      !$acc                  ws,          &
+      !$acc                  uw,          &
+      !$acc                  vw,          &
+      !$acc                  w3,          &
+      !$acc                  uv,          &
+      !$acc                  t2,          &
+      !$acc                  ut,          &
+      !$acc                  vt,          &
+      !$acc                  us,          &
+      !$acc                  vs,          &
+      !$acc                  ts,          &
+      !$acc                  s2,          &
+      !$acc                  eps)
 
       deallocate(KspsD,    &
                  KspsU,    &
