@@ -42,7 +42,7 @@ module ocn_adc_mixing
     integer :: iCell, k, idx
     real,dimension(nCells) :: wstar
     logical :: first
-    real :: maximum, Q
+    real :: maximum, Q, KE
 
     first = .true.
 
@@ -75,6 +75,8 @@ module ocn_adc_mixing
       vw(:,1,iCell) = vwsfc(iCell)
       wt(:,1,iCell) = wtsfc(iCell)
       ws(:,1,iCell) = wssfc(iCell)
+      KE = 0.5*(u2(i1,1,iCell) + v2(i1,1,iCell))
+      eps(:,1,iCell) = KE**1.5/(0.5*(ze(1,iCell) - ze(2,iCell) + 1.0E-10_RKIND))
     enddo
 
   end subroutine build_diagnostic_arrays
@@ -229,8 +231,14 @@ module ocn_adc_mixing
         tomDN = u2w(k,iCell) + v2w(k,iCell) + 0.0_RKIND*w3(i1,k,iCell)
         tauAV = 0.5_RKIND*(tauUP + tauDN)
 
-        epstend(k) = -0.8_RKIND*((tomUP / (0.5_RKIND*(tauM1 + tau) + 1.0E-10_RKIND) - tomDN / &
-          (0.5_RKIND*(tau + tauP1) + 1.0E-10_RKIND)) / (zm(k-1,iCell) - zm(k,iCell))) - &
+        tomUP = 0.5577/(0.5_RKIND*(tau + tauM1)+1.0E-10_RKIND)*(eps(i1,k-1,iCell) - &
+          eps(i1,k,iCell)) / (ze(k-1,iCell) - ze(k,iCell) + 1.0E-10_RKIND)
+        tomDN = 0.5577/(0.5_RKIND*(tau + tauP1)+1.0E-10_RKIND)*(eps(i1,k,iCell) - &
+          eps(i1,k+1,iCell)) / (ze(k,iCell) - ze(k+1,iCell) + 1.0E-10_RKIND)
+
+        epstend(k) = 2.0_RKIND*(tomUP - tomDN) / (zm(k-1,iCell) - zm(k,iCell) + 1.0E-10_RKIND) - &
+        !-0.8_RKIND*((tomUP / (0.5_RKIND*(tauM1 + tau) + 1.0E-10_RKIND) - tomDN / &
+         ! (0.5_RKIND*(tau + tauP1) + 1.0E-10_RKIND)) / (zm(k-1,iCell) - zm(k,iCell))) - &
           2.88/(tau + 1.0E-10_RKIND)*uw(i1,k,iCell)*(uvel(k-1,iCell) - uvel(k,iCell)) / &
           (zm(k-1,iCell) - zm(k,iCell)) - &
           2.88/(tau + 1.0E-10_RKIND)*vw(i1,k,iCell)*(vvel(k-1,iCell) - vvel(k,iCell)) / &
@@ -497,7 +505,7 @@ module ocn_adc_mixing
         KmU(k+1,iCell)) * (KspsU(k,iCell) - KspsU(k+1,iCell)) /     &
         (ze(k,iCell) - ze(k+1,iCell))) / dz -                                 &
         Cval*KspsU(k,iCell)**1.5_RKIND/(1.0E-15 + lenspsU(k,iCell)) +                     &
-        epsSPS(k,iCell) / (2.0_RKIND*areaFraction(k,iCell))
+        eps(i1,k,iCell) / (2.0_RKIND*areaFraction(k,iCell))
 
       if(k==2) then
         Cval = 3.96_RKIND
@@ -512,7 +520,7 @@ module ocn_adc_mixing
         KmD(k+1,iCell)) * (KspsD(k,iCell) - KspsD(k+1,iCell)) /     &
         (ze(k,iCell) - ze(k+1,iCell))) / dz -                                 &
         Cval*KspsD(k,iCell)**1.5_RKIND / lenspsD(k,iCell) +                   &
-        epsSPS(k,iCell) / (2.0_RKIND*(1.0_RKIND - areaFraction(k,iCell)))
+        eps(i1,k,iCell) / (2.0_RKIND*(1.0_RKIND - areaFraction(k,iCell)))
     enddo
   enddo
 
