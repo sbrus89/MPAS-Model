@@ -49,6 +49,8 @@ module ocn_turbulence
                        c_therm, c_mom_w3, c_pt, c_ps, c_pv, &
                        kappa_FL, kappa_w3, kappa_VAR, Cww_D, Cww_E
 
+   integer,public :: iterCount, nCells, nVertLevels
+
    real(kind=RKIND),public, dimension(:,:), allocatable :: KspsU, KspsD, ze, zm, &
                        epsSPS, lendn, lenup, length, lenspsD, lenspsU, KhU, KhD, KmU,  &
                        KmD, wt_spsU, wt_spsD, ws_spsU, ws_spsD, uw2,  &
@@ -123,21 +125,23 @@ module ocn_turbulence
                        uwTmp, vwTmp, wtTmp, wsTmp, w3Tmp, uvTmp, utTmp, vtTmp, usTmp,&
                        vsTmp, tsTmp, epsTmp
 
-   integer, pointer :: nVertLevels, nVertLevelsP1
-   integer :: nCells
+   integer, pointer :: iterCountTmp, nVertLevelsTmp, nVertLevelsP1
+   integer :: nCellsTmp
    integer, dimension(:), pointer :: nCellsArray
 
    block => domain % blocklist
    do while (associated(block))
       call mpas_pool_get_subpool(block % structs, 'mesh', meshPool)
-      call mpas_pool_get_dimension(meshPool, 'nVertLevels', nVertLevels)
+      call mpas_pool_get_dimension(meshPool, 'nVertLevels', nVertLevelsTmp)
       call mpas_pool_get_dimension(meshPool, 'nVertLevelsP1', nVertLevelsP1)
       call mpas_pool_get_dimension(meshPool, 'nCellsArray', nCellsArray)
 
-      nCells = nCellsArray( size(nCellsArray) )
+      nCellsTmp = nCellsArray( size(nCellsArray) )
       call mpas_pool_get_subpool(block % structs, 'adcDiagnosticArrays', adcDiagnosticsPool)
       call mpas_pool_get_subpool(block % structs, 'adcTendArrays', adcTendPool)
       call mpas_pool_get_subpool(block % structs, 'adcPrognosticArrays', adcPrognosticsPool)
+      nCells = nCellsTmp
+      nVertLevels = nVertLevelsTmp
       sigmat = config_adc_sigmat
       grav = gravity
       epsilon = config_adc_epsilon
@@ -167,6 +171,7 @@ module ocn_turbulence
       kappa_FL = config_adc_kappaFL
       kappa_VAR = config_adc_kappaVAR
       kappa_w3 = config_adc_kappaW3
+      iterCount = 1
 
       call mpas_pool_get_array(adcDiagnosticsPool, 'KspsD', KspsDTmp)
       call mpas_pool_get_array(adcDiagnosticsPool, 'KspsU', KspsUTmp)
@@ -493,8 +498,41 @@ module ocn_turbulence
       block => block % next
    end do
 !   at end could do a copy to accelerator
+! need to copyin the parameters I guess...
 
       !$acc enter data copyin(KspsD,    &
+      !$acc                   nCells,   &
+      !$acc                   nVertLevels,  &
+      !$acc                   sigmat,       &
+      !$acc                   grav,         &
+      !$acc                   epsilon,      &
+      !$acc                   Ko,           &
+      !$acc                   gamma1,       &
+      !$acc                   beta5,        &
+      !$acc                   c1,           &
+      !$acc                   c2,           &
+      !$acc                   c8,           &
+      !$acc                   c10,          &
+      !$acc                   c11,          &
+      !$acc                   alpha1,       &
+      !$acc                   alpha2,       &
+      !$acc                   alpha3,       &
+      !$acc                   B1,           &
+      !$acc                   Kt,           &
+      !$acc                   c_1,          &
+      !$acc                   c_2,          &
+      !$acc                   c_mom,        &
+      !$acc                   c_therm,      &
+      !$acc                   c_mom_w3,     &
+      !$acc                   c_pt,         &
+      !$acc                   c_ps,         &
+      !$acc                   c_pv,         &
+      !$acc                   Cww_D,        &
+      !$acc                   Cww_E,        &
+      !$acc                   kappa_FL,     &
+      !$acc                   kappa_VAR,    &
+      !$acc                   kappa_w3,     &
+      !$acc                   iterCount,    &
       !$acc                  KspsU,    &
       !$acc                  ze,       &
       !$acc                  zm,       &
@@ -643,6 +681,38 @@ module ocn_turbulence
       !should not ever need an update device no quantities get calculated on host
 
       !$acc update host(KspsD,    &
+      !$acc                   nCells,   &
+      !$acc                   nVertLevels,  &
+      !$acc                   sigmat,       &
+      !$acc                   grav,         &
+      !$acc                   epsilon,      &
+      !$acc                   Ko,           &
+      !$acc                   gamma1,       &
+      !$acc                   beta5,        &
+      !$acc                   c1,           &
+      !$acc                   c2,           &
+      !$acc                   c8,           &
+      !$acc                   c10,          &
+      !$acc                   c11,          &
+      !$acc                   alpha1,       &
+      !$acc                   alpha2,       &
+      !$acc                   alpha3,       &
+      !$acc                   B1,           &
+      !$acc                   Kt,           &
+      !$acc                   c_1,          &
+      !$acc                   c_2,          &
+      !$acc                   c_mom,        &
+      !$acc                   c_therm,      &
+      !$acc                   c_mom_w3,     &
+      !$acc                   c_pt,         &
+      !$acc                   c_ps,         &
+      !$acc                   c_pv,         &
+      !$acc                   Cww_D,        &
+      !$acc                   Cww_E,        &
+      !$acc                   kappa_FL,     &
+      !$acc                   kappa_VAR,    &
+      !$acc                   kappa_w3,     &
+      !$acc                   iterCount,    &
       !$acc                  KspsU,    &
       !$acc                  ze,       &
       !$acc                  zm,       &
@@ -1032,7 +1102,39 @@ module ocn_turbulence
       kappa_w3 = 0.0_RKIND
 
       !$acc exit data delete(KspsD,    &
-      !$acc                  KspsU,    &
+      !$acc                   nCells,   &
+      !$acc                   nVertLevels,  &
+      !$acc                   sigmat,       &
+      !$acc                   grav,         &
+      !$acc                   epsilon,      &
+      !$acc                   Ko,           &
+      !$acc                   gamma1,       &
+      !$acc                   beta5,        &
+      !$acc                   c1,           &
+      !$acc                   c2,           &
+      !$acc                   c8,           &
+      !$acc                   c10,          &
+      !$acc                   c11,          &
+      !$acc                   alpha1,       &
+      !$acc                   alpha2,       &
+      !$acc                   alpha3,       &
+      !$acc                   B1,           &
+      !$acc                   Kt,           &
+      !$acc                   c_1,          &
+      !$acc                   c_2,          &
+      !$acc                   c_mom,        &
+      !$acc                   c_therm,      &
+      !$acc                   c_mom_w3,     &
+      !$acc                   c_pt,         &
+      !$acc                   c_ps,         &
+      !$acc                   c_pv,         &
+      !$acc                   Cww_D,        &
+      !$acc                   Cww_E,        &
+      !$acc                   kappa_FL,     &
+      !$acc                   kappa_VAR,    &
+      !$acc                   kappa_w3,     &
+      !$acc                   iterCount,    &
+    !$acc                  KspsU,    &
       !$acc                  ze,       &
       !$acc                  zm,       &
       !$acc                  epsSPS,      &

@@ -306,10 +306,6 @@ module ocn_adc_mixing
                 (2.0_RKIND * sqrt(KE) * bvfT + 1.0E-15)
         if(len2_2 < 0) len2_2 = 1.0E15_RKIND
 
-        if(k==2) then
-          print *, len0,len1,len2_1,len2_2
-        endif
-
         if(ze(k,iCell) < -boundaryLayerDepth(iCell)) THEN
           lengthT = 1.0_RKIND / len0 + 1.0_RKIND / len1 + 1.0_RKIND / len2_1 + 1.0_RKIND
         else
@@ -835,14 +831,6 @@ module ocn_adc_mixing
         endif
 
       enddo
-
-!      k=1
-!      w3check = (w2(i1,k,iCell)+w2(i1,k+1,iCell))**1.5
-!      w3(i2,k,iCell) = min(w3(i1,k,iCell) + dt*w3tend(k,iCell),w3check)
-!      do k=2,nVertLevels
-!        w3check = (w2(i1,k,iCell) + w2(i1,k+1,iCell))**1.5
-!        w3(i2,k,iCell) = min(w3(i1,k,iCell) + dt*w3tend(k,iCell),w3check)
-!      enddo
 
       do k=2,nVertLevels
         dz = (zm(k-1,iCell) - zm(k,iCell))

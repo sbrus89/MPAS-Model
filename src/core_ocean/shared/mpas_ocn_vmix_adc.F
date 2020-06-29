@@ -21,6 +21,7 @@ module ocn_vmix_adc
    use mpas_vector_reconstruction
    use mpas_timekeeping
 
+   use ocn_adc_mixing_fused
    use ocn_adc_mixing
    use ocn_surface_bulk_forcing
    use ocn_surface_land_ice_fluxes
@@ -321,7 +322,7 @@ contains
        local_nCells = nCells
      endif
 
-     call ADC_main_loop(local_nCells, nVertLevels, ntracers, dt, activeTracers, velocityZonal, velocityMeridional, &
+     call compute_ADC_tends(local_nCells, nVertLevels, ntracers, dt, activeTracers, velocityZonal, velocityMeridional, &
           BruntVaisalaFreqTop, uw_sfc, vw_sfc, -wt_sfc, ws_sfc, inSituThermalExpansionCoeff,        &
           inSituSalineContractionCoeff, fCell, boundaryLayerDepth)
 
