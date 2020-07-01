@@ -105,6 +105,7 @@ module ocn_time_integration_split
       type (mpas_pool_type), pointer :: forcingPool
       type (mpas_pool_type), pointer :: scratchPool
       type (mpas_pool_type), pointer :: swForcingPool
+      type (mpas_pool_type), pointer :: mixedLayerDepthsAMPool
 
       type (dm_info) :: dminfo
       integer :: iCell, i,k,j, iEdge, cell1, cell2, split_explicit_step, split, &
@@ -1822,12 +1823,13 @@ module ocn_time_integration_split
         call mpas_pool_get_subpool(block % structs, 'mesh', meshPool)
         call mpas_pool_get_subpool(block % structs, 'diagnostics', diagnosticsPool)
         call mpas_pool_get_subpool(block % structs, 'scratch', scratchPool)
+        call mpas_pool_get_subpool(blocK % structs, 'mixedLayerDepthsAM',mixedLayerDepthsAMPool)
         ! Compute normalGMBolusVelocity; it will be added to the baroclinic modes in Stage 2 above.
         if (config_use_standardGM) then
            call ocn_gm_compute_Bolus_velocity(diagnosticsPool, meshPool, scratchPool)
         end if
         call ocn_vmix_implicit(dt, meshPool, diagnosticsPool, statePool, forcingPool, &
-            scratchPool, err, 2)
+            scratchPool, mixedLayerDepthsAMPool, err, 2)
 
         block => block % next
       end do

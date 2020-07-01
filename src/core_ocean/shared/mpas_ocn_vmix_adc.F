@@ -22,7 +22,6 @@ module ocn_vmix_adc
    use mpas_timekeeping
 
    use ocn_adc_mixing_fused
-   use ocn_adc_mixing
    use ocn_surface_bulk_forcing
    use ocn_surface_land_ice_fluxes
    use ocn_turbulence
@@ -82,7 +81,7 @@ contains
 !-----------------------------------------------------------------------
 
    subroutine ocn_vmix_adc_mix(meshPool, statePool, forcingPool, diagnosticsPool, &
-      dt, err, timeLevelIn)!{{{
+      mixedLayerDepthsAMPool, dt, err, timeLevelIn)!{{{
 
       !-----------------------------------------------------------------
       !
@@ -110,6 +109,9 @@ contains
       type (mpas_pool_type), intent(inout) :: &
          forcingPool   !< Input/Output: forcing information
 
+      type (mpas_pool_type), intent(in) :: &
+         mixedLayerDepthsAMPool
+
       type (mpas_pool_type), pointer :: tracersPool, tracersSurfaceFluxPool
 
       real(KIND=RKIND), intent(in) :: dt
@@ -134,7 +136,7 @@ contains
         stressZonal, stressMeridional, fCell, &
         surfaceStress, surfaceStressMagnitude, bottomDepth,  &
         penetrativeTemperatureFlux, angleEdge, surfaceThicknessFlux, &
-        surfaceThicknessFluxRunoff, boundaryLayerDepth
+        dThreshMLD, surfaceThicknessFluxRunoff, boundaryLayerDepth
 
       real (kind=RKIND), dimension(:,:), pointer :: &
         normalVelocity, layerThickness, velocityZonal, velocityMeridional, &
@@ -204,6 +206,7 @@ contains
       call mpas_pool_get_array(forcingPool, "surfaceThicknessFlux", surfaceThicknessFlux)
       call mpas_pool_get_array(forcingPool, "surfaceThicknessFluxRunoff", surfaceThicknessFluxRunoff)
 
+      call mpas_pool_get_array(mixedLayerDepthsAMPool, 'dThreshMLD', dThreshMLD)
       call mpas_pool_get_array(diagnosticsPool, "boundaryLayerDepth", boundaryLayerDepth)
       call mpas_pool_get_array(diagnosticsPool, 'inSituThermalExpansionCoeff', inSituThermalExpansionCoeff)
       call mpas_pool_get_array(diagnosticsPool, 'inSituSalineContractionCoeff', inSituSalineContractionCoeff)
@@ -324,7 +327,7 @@ contains
 
      call compute_ADC_tends(local_nCells, nVertLevels, ntracers, dt, activeTracers, velocityZonal, velocityMeridional, &
           BruntVaisalaFreqTop, uw_sfc, vw_sfc, -wt_sfc, ws_sfc, inSituThermalExpansionCoeff,        &
-          inSituSalineContractionCoeff, fCell, boundaryLayerDepth)
+          inSituSalineContractionCoeff, fCell, dThreshMLD)
 
         !need to add interpolation back to N. Velocity!
      if ( config_adc_use_single_column ) THEN
@@ -413,6 +416,11 @@ contains
         call mpas_log_write( "Cannot use ADC mixing and CVMix at the same time:" // &
                "set either config_use_cvmix or config_adc_enable to .false.", MPAS_LOG_CRIT)
       endif
+
+      if(.not. config_AM_mixedLayerDepths_enable) then
+        call mpas_log_write("ADC mixing requires the MLD calculation to be enabled!", MPAS_LOG_CRIT)
+      endif
+
       !
       ! pull nVertLevels out of the mesh structure
       !
@@ -443,8 +451,8 @@ contains
          nCells = nCellsArray( size(nCellsArray) )
          do iCell = 1, nCells
             do k = 1, nVertLevels+1
-               KspsU(k,iCell) = epsilon
-               KspsD(k,iCell) = epsilon
+               KspsU(:,k,iCell) = epsilon
+               KspsD(:,k,iCell) = epsilon
                w2(:,k,iCell) = 1.0E-8_RKIND 
                areaFraction(k,iCell) = 0.5_RKIND
                tumd(k,iCell) = 0.0_RKIND

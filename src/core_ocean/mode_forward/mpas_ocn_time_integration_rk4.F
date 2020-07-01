@@ -103,6 +103,7 @@ module ocn_time_integration_rk4
       type (mpas_pool_type), pointer :: forcingPool
       type (mpas_pool_type), pointer :: scratchPool
       type (mpas_pool_type), pointer :: swForcingPool
+      type (mpas_pool_type), pointer :: mixedLayerDepthsAMPool
 
       integer :: rk_step
 
@@ -1393,7 +1394,7 @@ module ocn_time_integration_rk4
 
       type (mpas_pool_type), pointer :: statePool, meshPool, forcingPool
       type (mpas_pool_type), pointer :: diagnosticsPool, scratchPool
-      type (mpas_pool_type), pointer :: tracersPool
+      type (mpas_pool_type), pointer :: tracersPool, mixedLayerDepthsAMPool
 
       real (kind=RKIND), dimension(:, :), pointer :: layerThicknessNew, normalVelocityNew
       real (kind=RKIND), dimension(:, :), pointer :: normalTransportVelocity, normalGMBolusVelocity
@@ -1420,6 +1421,7 @@ module ocn_time_integration_rk4
       call mpas_pool_get_subpool(block % structs, 'forcing', forcingPool)
       call mpas_pool_get_subpool(block % structs, 'diagnostics', diagnosticsPool)
       call mpas_pool_get_subpool(block % structs, 'scratch', scratchPool)
+      call mpas_pool_get_subpool(block % structs, 'mixedLayerDepthsAM', mixedLayerDepthsAMPool)
 
       call mpas_pool_get_subpool(statePool, 'tracers', tracersPool)
 
@@ -1453,7 +1455,7 @@ module ocn_time_integration_rk4
       call ocn_diagnostic_solve(dt, statePool, forcingPool, meshPool, diagnosticsPool, scratchPool, tracersPool, 2)
       call mpas_threading_barrier()
 
-      call ocn_vmix_implicit(dt, meshPool, diagnosticsPool, statePool, forcingPool, scratchPool, err, 2)
+      call ocn_vmix_implicit(dt, meshPool, diagnosticsPool, statePool, forcingPool, scratchPool, mixedLayerDepthsAMPool, err, 2)
       call mpas_threading_barrier()
 
    end subroutine ocn_time_integrator_rk4_cleanup!}}}

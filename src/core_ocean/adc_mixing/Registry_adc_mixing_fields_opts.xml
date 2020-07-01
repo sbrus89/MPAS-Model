@@ -96,12 +96,6 @@
 		<package name="adcMixingPKG" description="This package includes variables required for the assumed distribution closure model."/>
 	</packages>
 	<var_struct name="adcDiagnosticArrays" time_levs="1" packages="adcMixingPKG">
-    <var name="KspsU" type="real" dimensions="nVertLevelsP1 nCells Time" units="m^2/s^{-2}"
-			 description="sub plume scale TKE for upward moving plumes"
-		/>
-    <var name="KspsD" type="real" dimensions="nVertLevelsP1 nCells Time" units="m^2/s^{-2}"
-			 description="sub plume scale TKE for downward moving plumes"
-		/>
 		<var name="ze" type="real" dimensions="nVertLevelsP1 nCells Time" units="m"
 			 description="depth coordinate at cell top referenced to zero at SSH"
 		/>
@@ -347,7 +341,13 @@
     />
 	</var_struct>
   <var_struct name="adcPrognosticArrays" time_levs="2" packages="adcMixingPKG">
-    <var name="eps" type="real" dimensions="nVertLevelsP1 nCells Time" units="m^2/s^3"
+    <var name="KspsU" type="real" dimensions="nVertLevelsP1 nCells Time" units="m^2/s^{-2}"
+			 description="sub plume scale TKE for upward moving plumes"
+		/>
+    <var name="KspsD" type="real" dimensions="nVertLevelsP1 nCells Time" units="m^2/s^{-2}"
+			 description="sub plume scale TKE for downward moving plumes"
+		/>
+   <var name="eps" type="real" dimensions="nVertLevelsP1 nCells Time" units="m^2/s^3"
        description="prognostic dissipation rate"
     />
     <var name="u2" type="real" dimensions="nVertLevelsP1 nCells Time" units="m^2/s^2"
