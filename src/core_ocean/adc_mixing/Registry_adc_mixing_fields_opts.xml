@@ -6,7 +6,11 @@
 		<nml_option name="config_adc_timestep" type="real" default_value="5" units="unitless"
 			description="timestep for the turbulence updates and subcycling (now in sec, probably should unify with MPAS later)"
 			possible_values="small positive reals (less than MPAS timestep)"
-      />
+    />
+    <nml_option name="config_adc_use_old_length_scale" type="logical" default_value=".false." units="unitless"
+      description="flag to use buoyancy length scale from previous closure, temporary"
+      possible_values=".true. or .false."
+    />
     <nml_option name="config_adc_tau_o" type="real" default_value="1800" units="s^{-1}"
       description="characterstic eddy turnover timescale"
       possible_values="positive real numbers"
