@@ -134,109 +134,6 @@ module ocn_adc_mixing_fused
 
   end subroutine dissipation_lengths2
 
-  subroutine build_diagnostic_arrays(iCell,nCells,nVertLevels,BVF,wtsfc,wssfc, &
-          uwsfc, vwsfc, alphaT,betaS, boundaryLayerDepth)
-    !construct dTdz, dSdz, dbdz
-    integer,intent(in) :: nCells,iCell, nVertLevels
-    real,dimension(nCells),intent(in) :: wtsfc, wssfc, uwsfc, vwsfc
-    real,dimension(nCells),intent(in) :: boundaryLayerDepth
-    real,dimension(nVertLevels,nCells),intent(in) :: BVF, alphaT, betaS
-    integer :: k, idx, idx2
-    
-    real :: wstar
-    logical :: first
-    real :: coeff, maximum, Q, KE
-
-    first = .true.
-
-!    do iCell=1,nCells
-      Q = grav*(alphaT(1,iCell)*wtsfc(iCell) - betaS(1,iCell)*wssfc(iCell))* &
-        boundaryLayerDepth(iCell)
-      if(Q > 0) then
-        wstar = abs(Q)**(1.0/3.0)
-      else
-        wstar = 0.0
-      endif
-
-      u2(:,1,iCell) = 4.0*uwsfc(iCell) + 0.3*wstar**2.0
-      v2(:,1,iCell) =4.*uwsfc(iCell) + 0.3*wstar**2.0
-      uw(:,1,iCell) = -uwsfc(iCell)
-      vw(:,1,iCell) = vwsfc(iCell)
-      wt(:,1,iCell) = wtsfc(iCell)
-      ws(:,1,iCell) = wssfc(iCell)
-      KE = 0.5*(u2(i1,1,iCell) + v2(i1,1,iCell))
-      eps(:,1,iCell) = KE**1.5/(0.5*(ze(1,iCell) - ze(2,iCell) + 1.0E-10_RKIND))
-!    enddo
-
-  end subroutine build_diagnostic_arrays
-
-  subroutine build_areaFraction_properties(iCell,nCells,nVertLevels,wtsfc, wssfc, alphaT,  &
-      betaS, boundaryLayerDepth, tlev)
-
-      integer,intent(in) :: nCells, nVertLevels, tlev, iCell
-      real,dimension(nCells),intent(in) :: wtsfc, wssfc, boundaryLayerDepth
-      real, dimension(nVertLevels,nCells) :: alphaT, betaS
-
-      real :: wtav, McAv, sigav, tumdav, wumdav, sumdav, wb, bld, wstar
-      real :: Sw, w3av, lareaFraction, wsav
-      integer :: k
-
-!      do iCell = 1,nCells
-        tumd(1,iCell) = 0.0_RKIND
-        wumd(1,iCell) = 0.0_RKIND
-        areaFraction(1,iCell) = 0.5_RKIND
-        Mc(1,iCell) = 0.0_RKIND
-        wb = grav*(alphaT(1,iCell)*wtsfc(iCell) - betaS(1,iCell)*wssfc(iCell))
-
-        if(wb > 0.0) then
-          wb = grav*(alphaT(1,iCell)*wtsfc(iCell) - betaS(1,iCell)*wssfc(iCell))
-          wstar = (abs(0.4_RKIND*boundaryLayerDepth(iCell)*wb))**(1.0_RKIND/3.0_RKIND)
-          w2t(1,iCell) = -0.3_RKIND*wstar * wtsfc(iCell)
-          !Below FIXME!
-          w2s(1,iCell) = 0.3_RKIND*wstar * wssfc(iCell)
-        else
-          w2t(1,iCell) = 0.0_RKIND
-          w2s(1,iCell) = 0.0_RKIND
-        endif
-
-        !try new boundary condition derived from PDF
-        sigav = 0.5_RKIND*(areaFraction(1,iCell) + areaFraction(2,iCell))
-        wtav = 0.5_RKIND*(wt(tlev,1,iCell) + wt(tlev,2,iCell))
-        McAv = 0.5_RKIND*(w2(tlev,1,iCell) + w2(tlev,2,iCell))
-        w2t(1,iCell) = (1.0_RKIND - 2.0_RKIND*sigav)*wtav*sqrt(McAv) / (EPSILON + &
-          sigav*(1.0_RKIND-sigav))
-
-        do k=2,nVertLevels
-          w3av = 0.5_RKIND*(w3(tlev,k-1,iCell) + w3(tlev,k,iCell))
-
-          Sw = w3av / (max(w2(tlev,k,iCell)**1.5_RKIND,epsilon))
-          lareaFraction = 0.5_RKIND - 0.5_RKIND*Sw / sqrt(4.0_RKIND + Sw**2.0_RKIND)
-
-          if(lareaFraction < 0.01_RKIND) lareaFraction = 0.01_RKIND
-          if(lareaFraction > 0.99_RKIND) lareaFraction = 0.99_RKIND
-
-          areaFraction(k,iCell) = lareaFraction
-          wumd(k,iCell) = sqrt(w2(tlev,k,iCell) / (areaFraction(k,iCell) * &
-             (1.0_RKIND - areaFraction(k,iCell))))
-          Mc(k,iCell) = areaFraction(k,iCell)*(1.0_RKIND - &
-             areaFraction(k,iCell)) * wumd(k,iCell)
-
-          tumd(k,iCell) = wt(tlev,k,iCell) / (1.0E-12_RKIND + Mc(k,iCell))
-          sumd(k,iCell) = ws(tlev,k,iCell) / (1.0E-12_RKIND + Mc(k,iCell))
-        enddo
-
-        do k=2,nVertLevels
-          sigav = 0.5_RKIND*(areaFraction(k,iCell) + areaFraction(k+1,iCell))
-          tumdav = 0.5_RKIND*(tumd(k,iCell) + tumd(k+1,iCell))
-          sumdav = 0.5_RKIND*(sumd(k,iCell) + sumd(k+1,iCell))
-          wumdav = 0.5_RKIND*(wumd(k,iCell) + wumd(k+1,iCell))
-          w2t(k,iCell) = sigav*(1.0_RKIND - sigav)*(1.0_RKIND - 2.0_RKIND*sigav)*wumdav**2.0_RKIND*tumdav
-          w2s(k,iCell) = sigav*(1.0_RKIND - sigav)*(1.0_RKIND - 2.0_RKIND*sigav)*wumdav**2.0_RKIND*sumdav
-        enddo
-!      enddo !iCell loop end
-
-  end subroutine build_areaFraction_properties
-
   subroutine compute_ADC_tends(nCells,nVertLevels, nTracers, dt,activeTracers, uvel, vvel, BVF,  &
                   uwsfc, vwsfc, wtsfc, wssfc, alphaT, betaS, fCell, boundaryLayerDepth)
 
@@ -264,33 +161,100 @@ module ocn_adc_mixing_fused
       real :: KEm1, KEp1, tauUP, tauDN, tomUP, tomDN
       real :: tauM1, tau, tauP1, tauAV, utemp, vtemp
       real :: B, Cval, diff, wtav, dzmid, Ksps, Sz, Tz
-      real :: w3av, tempMoment
+      real :: Q, w3av, tempMoment
 
       real,dimension(nVertLevels,nCells) :: taupt, taups, taupv
       real,dimension(nVertLevels+1,nCells) :: wttend, wstend, uwtend, vwtend, u2tend, v2tend, &
         uttend, vttend, ustend, vstend, uvtend
-      real,dimension(nVertLevels) :: epstend
+      real,dimension(nVertLevels,nCells) :: epstend
       real,dimension(nVertLevels+1,nCells) :: KspsUtend, KspsDtend
 
       dt_small = config_adc_timestep
       niter = dt / dt_small
 
       call swap_time_levels
+
+      !on further examination build_diagnostics array can live outside the iter loop
       do iCell=1,nCells
+        Q = grav*(alphaT(1,iCell)*wtsfc(iCell) - betaS(1,iCell)*wssfc(iCell))* &
+            boundaryLayerDepth(iCell)
+        if(Q > 0) then
+          wstar = abs(0.4_RKIND*Q)**(1.0/3.0)
+        else
+          wstar = 0.0
+        endif
+
+        tumd(1,iCell) = 0.0_RKIND
+        wumd(1,iCell) = 0.0_RKIND
+        areaFraction(1,iCell) = 0.5_RKIND
+        Mc(1,iCell) = 0.0_RKIND
+        w2t(1,iCell) = -0.3_RKIND*wstar * wtsfc(iCell)
+        w2s(1,iCell) = 0.3_RKIND*wstar * wssfc(iCell)
+
+        length(nVertLevels+1,iCell) = 1e-15_RKIND
+        length(1,iCell) = ze(1,iCell) - ze(2,iCell)
+
+        do k=1,2
+          u2(k,1,iCell) = 4.0*uwsfc(iCell) + 0.3*wstar**2.0
+          v2(k,1,iCell) =4.*uwsfc(iCell) + 0.3*wstar**2.0
+          uw(k,1,iCell) = -uwsfc(iCell)
+          vw(k,1,iCell) = vwsfc(iCell)
+          wt(k,1,iCell) = wtsfc(iCell)
+          ws(k,1,iCell) = wssfc(iCell)
+          KE = 0.5*(u2(i1,1,iCell) + v2(i1,1,iCell))
+          eps(k,1,iCell) = KE**1.5/(0.5*(ze(1,iCell) - ze(2,iCell) + 1.0E-10_RKIND))
+        enddo
+      enddo
+
       do iIter=1,niter
+        ! We should test the use of this value versus the one above
+        do iCell=1,nCells
+          sigav = 0.5_RKIND*(areaFraction(1,iCell) + areaFraction(2,iCell))
+          wtav = 0.5_RKIND*(wt(tlev,1,iCell) + wt(tlev,2,iCell))
+          McAv = 0.5_RKIND*(w2(tlev,1,iCell) + w2(tlev,2,iCell))
+          w2t(1,iCell) = (1.0_RKIND - 2.0_RKIND*sigav)*wtav*sqrt(McAv) / (EPSILON + &
+                         sigav*(1.0_RKIND-sigav))
+        enddo
 
-          !First do all the center based quantities (third order moments)
-          !Call these few things now but inline later
-          call build_diagnostic_arrays(iCell,nCells,nVertLevels,BVF,wtsfc,wssfc,  &
-            uwsfc,vwsfc,alphaT,betaS,boundaryLayerDepth)
+        !Kernel 1 inlined versions of the base arrays, needed for later to make them collapsible
+        do iCell=1,nCells
+          do k=2,nVertLevels
+            w3av = 0.5_RKIND*(w3(i1,k-1,iCell) + w3(i1,k,iCell))
 
-          call build_areaFraction_properties(iCell,nCells, nVertLevels,wtsfc, wssfc, &
-                                    alphaT, betaS, boundaryLayerDepth, 2)
+            Sw = w3av / (max(w2(i1,k,iCell)**1.5_RKIND,epsilon))
+            lareaFraction = 0.5_RKIND - 0.5_RKIND*Sw / sqrt(4.0_RKIND + Sw**2.0_RKIND)
 
-          !note to ashwath -- as you do the porting you need an update device here for the previous
-          !two function calls since those calculations will be on host.
-          !Now do TOM update
-        !  do iCell = 1,nCells
+            if(lareaFraction < 0.01_RKIND) lareaFraction = 0.01_RKIND
+            if(lareaFraction > 0.99_RKIND) lareaFraction = 0.99_RKIND
+
+            areaFraction(k,iCell) = lareaFraction
+            wumd(k,iCell) = sqrt(w2(i1,k,iCell) / (areaFraction(k,iCell) * &
+               (1.0_RKIND - areaFraction(k,iCell))))
+            Mc(k,iCell) = areaFraction(k,iCell)*(1.0_RKIND - &
+               areaFraction(k,iCell)) * wumd(k,iCell)
+
+            tumd(k,iCell) = wt(i1,k,iCell) / (1.0E-12_RKIND + Mc(k,iCell))
+            sumd(k,iCell) = ws(i1,k,iCell) / (1.0E-12_RKIND + Mc(k,iCell))
+          enddo
+        enddo
+
+        do iCell = 1,nCells
+          do k=2,nVertLevels
+            sigav = 0.5_RKIND*(areaFraction(k,iCell) + areaFraction(k+1,iCell))
+            tumdav = 0.5_RKIND*(tumd(k,iCell) + tumd(k+1,iCell))
+            sumdav = 0.5_RKIND*(sumd(k,iCell) + sumd(k+1,iCell))
+            wumdav = 0.5_RKIND*(wumd(k,iCell) + wumd(k+1,iCell))
+            w2t(k,iCell) = sigav*(1.0_RKIND - sigav)*(1.0_RKIND - 2.0_RKIND*sigav)*wumdav**2.0_RKIND*tumdav
+            w2s(k,iCell) = sigav*(1.0_RKIND - sigav)*(1.0_RKIND - 2.0_RKIND*sigav)*wumdav**2.0_RKIND*sumdav
+            !also use this loop to reset the cliptends for the step
+            u2cliptend(k,iCell) = 0.0_RKIND
+            v2cliptend(k,iCell) = 0.0_RKIND
+            w2cliptend(k,iCell) = 0.0_RKIND
+          enddo
+        enddo
+
+        !This cell loop computes w3Tend and TOMs for later tendencies.  Should be okay to collapse loops here
+        do iCell = 1,nCells
             do k=1,nVertLevels
               Eav = 0.5*(Entrainment(k+1,iCell) + Entrainment(k,iCell))
               Dav = 0.5*(Detrainment(k+1,iCell) + Detrainment(k,iCell))
@@ -375,18 +339,16 @@ module ocn_adc_mixing_fused
               vws(k,iCell) = -diff*(vs(i1,k,iCell) - vs(i1,k+1,iCell)) / dz
 
             enddo !nVertLevels
-         ! enddo !nCells
+          enddo !nCells
 
-          if(config_adc_use_old_length_scale)then
-								   call dissipation_lengths2(iCell,nCells,nVertLevels,activeTracers,alphaT,betaS)
-          endif
+          ! Ashwath -- I'm removing this possibility from this branch since it will be near impossible to 
+          ! parallelize well.  It's a loop over k with an inner loop expanding underneath.
+!          if(config_adc_use_old_length_scale)then
+!								   call dissipation_lengths2(iCell,nCells,nVertLevels,activeTracers,alphaT,betaS)
+!          endif
 
           !next all second order moment tendencies also apply tendencies
-!          do iCell=1,nCells
-            epstend(1) = 0.0_RKIND
-            u2cliptend(:,iCell) = 0.0_RKIND
-            v2cliptend(:,iCell) = 0.0_RKIND
-
+          do iCell=1,nCells
             do k=2,nVertLevels
               dzmid = (zm(k-1,iCell) - zm(k,iCell))
               dz = ze(k,iCell) - ze(k+1,iCell)
@@ -554,7 +516,7 @@ module ocn_adc_mixing_fused
                 eps(i1,k+1,iCell)) + 1.0E-15_RKIND)*(eps(i1,k,iCell) - &
                 eps(i1,k+1,iCell)) / (ze(k,iCell) - ze(k+1,iCell) + 1.0E-10_RKIND)
 
-              epstend(k) = (tomUP - tomDN) / (zm(k-1,iCell) - zm(k,iCell) + 1.0E-10_RKIND) - &
+              epstend(k,iCell) = (tomUP - tomDN) / (zm(k-1,iCell) - zm(k,iCell) + 1.0E-10_RKIND) - &
               !-0.8_RKIND*((tomUP / (0.5_RKIND*(tauM1 + tau) + 1.0E-10_RKIND) - tomDN / &
                ! (0.5_RKIND*(tau + tauP1) + 1.0E-10_RKIND)) / (zm(k-1,iCell) - zm(k,iCell))) - &
                 2.88/(tau + 1.0E-10_RKIND)*uw(i1,k,iCell)*(uvel(k-1,iCell) - uvel(k,iCell)) / &
@@ -618,6 +580,12 @@ module ocn_adc_mixing_fused
                 Cval*KspsD(i1,k,iCell)**1.5_RKIND / lenspsD(k,iCell) +                   &
                 eps(i1,k,iCell) / (2.0_RKIND*(1.0_RKIND - areaFraction(k,iCell)))
 
+            enddo ! nVertLevels
+          enddo ! nCells
+
+          !In this step we update second moments except w3 which needs updated w2
+          do iCell = 1,nCells
+            do k=1,nVertLevels
                 !update second order moment tendency here
                 w2(i2,k,iCell) = w2(i1,k,iCell) + dt_small*w2tend(k,iCell)
                 if(w2(i2,k,iCell) < epsilon) then
@@ -674,7 +642,7 @@ module ocn_adc_mixing_fused
                 endif
 
                 if(.not. config_adc_use_old_length_scale)then
-                   eps(i2,k,iCell) = eps(i1,k,iCell) + dt_small*epstend(k)
+                   eps(i2,k,iCell) = eps(i1,k,iCell) + dt_small*epstend(k,iCell)
                    if (eps(i2,k,iCell) < 1.0E-10_RKIND) then
                       eps(i2,k,iCell) = 1.0E-10_RKIND
                    endif
@@ -685,15 +653,10 @@ module ocn_adc_mixing_fused
                 KspsD(i2,k,iCell) = max(epsilon,KspsD(i1,k,iCell) + dt_small*KspsDtend(k,iCell))
 
             enddo !nVertLevels
-            lenspsU(nVertLevels,iCell) = lenspsU(nVertLevels-1,iCell)
-            lenspsD(nVertLevels,iCell) = lenspsD(nVertLevels-1,iCell)
-
-            length(nVertLevels+1,iCell) = 1e-15_RKIND
-            length(1,iCell) = length(2,iCell) !1e-1
-!          enddo !nCells for second order moment tendencies
+          enddo !nCells for second order moment tendencies
 
           ! update the third order w3 and mean fields
-!          do iCell = 1,nCells
+          do iCell = 1,nCells
             do k=1,nVertLevels
               w3check = (w2(i2,k,iCell) + w2(i2,k+1,iCell))**1.5
               w3(i2,k,iCell) = min(w3(i1,k,iCell) + dt_small*w3tend(k,iCell),w3check)
@@ -703,15 +666,14 @@ module ocn_adc_mixing_fused
                   MPAS_LOG_CRIT,realArgs=(/w3(i2,k,iCell)/),intArgs=(/k,iCell/))
               endif
             enddo
-!          enddo
+          enddo
       iterCount = iterCount + 1
-
       call swap_time_levels !probably a better way to do this, with supercycling maybe
-    enddo !end iteration loop -- substepping is done.
     enddo !end cell loop
-
+  enddo !end iteration loop -- substepping is done.
 
     !now that substepping is done, apply computed fluxes to update mean fields.
+    !you can collapse this loop too.
     do iCell = 1, nCells
       do k=1,nVertLevels
           utemp = uvel(k,iCell)
