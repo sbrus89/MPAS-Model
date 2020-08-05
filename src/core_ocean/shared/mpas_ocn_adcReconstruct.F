@@ -161,7 +161,7 @@ module ocn_adc_mixing_fused
       real :: KEm1, KEp1, tauUP, tauDN, tomUP, tomDN
       real :: tauM1, tau, tauP1, tauAV, utemp, vtemp
       real :: B, Cval, diff, wtav, dzmid, Ksps, Sz, Tz
-      real :: Q, w3av, tempMoment
+      real :: lareaFraction, wstar, Q, w3av, tempMoment
 
       real,dimension(nVertLevels,nCells) :: taupt, taups, taupv
       real,dimension(nVertLevels+1,nCells) :: wttend, wstend, uwtend, vwtend, u2tend, v2tend, &
@@ -210,8 +210,8 @@ module ocn_adc_mixing_fused
         ! We should test the use of this value versus the one above
         do iCell=1,nCells
           sigav = 0.5_RKIND*(areaFraction(1,iCell) + areaFraction(2,iCell))
-          wtav = 0.5_RKIND*(wt(tlev,1,iCell) + wt(tlev,2,iCell))
-          McAv = 0.5_RKIND*(w2(tlev,1,iCell) + w2(tlev,2,iCell))
+          wtav = 0.5_RKIND*(wt(i1,1,iCell) + wt(i1,2,iCell))
+          McAv = 0.5_RKIND*(w2(i1,1,iCell) + w2(i1,2,iCell))
           w2t(1,iCell) = (1.0_RKIND - 2.0_RKIND*sigav)*wtav*sqrt(McAv) / (EPSILON + &
                          sigav*(1.0_RKIND-sigav))
         enddo
@@ -669,7 +669,6 @@ module ocn_adc_mixing_fused
           enddo
       iterCount = iterCount + 1
       call swap_time_levels !probably a better way to do this, with supercycling maybe
-    enddo !end cell loop
   enddo !end iteration loop -- substepping is done.
 
     !now that substepping is done, apply computed fluxes to update mean fields.
