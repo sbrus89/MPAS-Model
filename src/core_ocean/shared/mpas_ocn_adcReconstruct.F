@@ -656,7 +656,7 @@ module ocn_adc_mixing_fused
                    length(k,iCell) = KE**1.5 / eps(i2,k,iCell)
                    else
                    KE = 0.5_RKIND*(u2(i2,k,iCell) + v2(i2,k,iCell) + w2(i2,k,iCell))
-                   eps = KE**1.5 / length(k,iCell)
+                   eps(:,k,iCell) = KE**1.5 / length(k,iCell)
                  endif
                 KspsU(i2,k,iCell) = max(epsilon,KspsU(i1,k,iCell) + dt_small*KspsUtend(k,iCell))
                 KspsD(i2,k,iCell) = max(epsilon,KspsD(i1,k,iCell) + dt_small*KspsDtend(k,iCell))
