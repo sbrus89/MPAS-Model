@@ -591,7 +591,7 @@ module ocn_adc_mixing_fused
 
           !In this step we update second moments except w3 which needs updated w2
           do iCell = 1,nCells
-            do k=1,nVertLevels
+            do k=2,nVertLevels
                 !update second order moment tendency here
                 w2(i2,k,iCell) = w2(i1,k,iCell) + dt_small*w2tend(k,iCell)
                 if(w2(i2,k,iCell) < epsilon) then
