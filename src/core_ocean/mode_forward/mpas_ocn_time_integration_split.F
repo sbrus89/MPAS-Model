@@ -1814,6 +1814,10 @@ module ocn_time_integration_split
       call mpas_threading_barrier()
 
       call mpas_dmpar_field_halo_exch(domain, 'surfaceFrictionVelocity')
+      call mpas_timer_start('se vmix halos normalVelFld')
+      call mpas_dmpar_field_halo_exch(domain, 'normalVelocity', timeLevel=2)
+      call mpas_timer_stop('se vmix halos normalVelFld')
+
 
       block => domain % blocklist
       do while(associated(block))
@@ -1824,7 +1828,17 @@ module ocn_time_integration_split
         call mpas_pool_get_subpool(block % structs, 'diagnostics', diagnosticsPool)
         call mpas_pool_get_subpool(block % structs, 'scratch', scratchPool)
         call mpas_pool_get_subpool(blocK % structs, 'mixedLayerDepthsAM',mixedLayerDepthsAMPool)
-        ! Compute normalGMBolusVelocity; it will be added to the baroclinic modes in Stage 2 above.
+          call mpas_pool_get_array(diagnosticsPool, 'velocityX', velocityX)
+         call mpas_pool_get_array(diagnosticsPool, 'velocityY', velocityY)
+         call mpas_pool_get_array(diagnosticsPool, 'velocityZ', velocityZ)
+         call mpas_pool_get_array(diagnosticsPool, 'velocityZonal', velocityZonal)
+         call mpas_pool_get_array(diagnosticsPool, 'velocityMeridional', velocityMeridional)
+         call mpas_pool_get_array(statePool, 'normalVelocity', normalVelocityNew, 2)
+         call mpas_reconstruct(meshPool, normalVelocityNew,  &
+                          velocityX, velocityY, velocityZ,   &
+                          velocityZonal, velocityMeridional, &
+                          includeHalos = .true.)
+     ! Compute normalGMBolusVelocity; it will be added to the baroclinic modes in Stage 2 above.
         if (config_use_standardGM) then
            call ocn_gm_compute_Bolus_velocity(diagnosticsPool, meshPool, scratchPool)
         end if
@@ -1902,6 +1916,7 @@ module ocn_time_integration_split
          nCells = nCellsPtr
          nEdges = nEdgesPtr
 
+         
          if (config_prescribe_velocity) then
             !$omp do schedule(runtime)
             do iEdge = 1, nEdges

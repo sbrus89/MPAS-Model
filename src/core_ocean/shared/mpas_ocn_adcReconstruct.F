@@ -441,6 +441,7 @@ module ocn_adc_mixing_fused
               uwtend(k,iCell) = uwtend1(k,iCell) + uwtend2(k,iCell) + &
                 uwtend3(k,iCell) + uwtend4(k,iCell) + uwtend5(k,iCell)
 
+
               vwtend(k,iCell) = (-(vw2(k-1,iCell) - vw2(k,iCell)) / dzmid +   &
                 0.5_RKIND*((0.8_RKIND-4.0_RKIND/3.0_RKIND*alpha1)*0.5_RKIND*KE**2.0_RKIND +  &
                 (alpha1 - alpha2)*v2(i1,k,iCell) + (alpha1 -   &
@@ -450,6 +451,7 @@ module ocn_adc_mixing_fused
                 taupv(k,iCell)*vw(i1,k,iCell) + kappa_FL*(vw(i1,k-1,iCell) &
                 - vw(i1,k+1,iCell)) / (ze(k-1,iCell) - ze(k+1,iCell))**2.0
 
+           
               uvtend(k,iCell) = (-(uvw(k-1,iCell) - uvw(k,iCell)) / dz + &
                 (1.0_RKIND - 0.5_RKIND*(alpha1+alpha2))*(uw(i1,k,iCell)*Vz &
                 + vw(i1,k,iCell)*Uz)) - taupv(k,iCell)*uv(i1,k,iCell) +           &

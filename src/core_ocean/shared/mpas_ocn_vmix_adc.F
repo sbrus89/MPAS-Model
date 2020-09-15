@@ -155,6 +155,7 @@ contains
      real (kind=RKIND), dimension(:), allocatable :: zonalAverage, meridionalAverage, uw_sfc, &
                            vw_sfc, ws_sfc, wt_sfc
 
+      real (kind=RKIND), dimension(:,:), allocatable :: utend, vtend, ttend, stend
       real (kind=RKIND) :: fac, dep1, dep2, fracAbsorbed, fracAbsorbedRunoff,  &
                            etime
 
@@ -235,10 +236,13 @@ contains
 
       allocate(zonalAverage(nVertLevels),meridionalAverage(nVertLevels))
 
-      nCells = nCellsArray( 2 )
-      nEdges = nEdgesArray( 1 )
+      nCells = nCellsArray( 4 )
+      nEdges = nEdgesArray( 3 )
 
       allocate(uw_sfc(nCells), vw_sfc(nCells), ws_sfc(nCells), wt_sfc(nCells))
+      allocate(utend(nVertLevels,nCells), vtend(nVertLevels,nCells))
+      allocate(ttend(nVertLevels,nCells), stend(nVertLevels,nCells))
+
       !$omp do schedule(runtime)
       do iEdge=1,nEdges
          surfaceStress(iEdge) = 0.0_RKIND
@@ -325,17 +329,24 @@ contains
        local_nCells = nCells
      endif
 
+     utend(:,:) = velocityZonal(:,:)
+     vtend(:,:) = velocityMeridional(:,:)
+     ttend(:,:) = activeTracers(1,:,:)
+     stend(:,:) = activeTracers(2,:,:)
+
      call compute_ADC_tends(local_nCells, nVertLevels, ntracers, dt, activeTracers, velocityZonal, velocityMeridional, &
-          BruntVaisalaFreqTop, uw_sfc, vw_sfc, -wt_sfc, ws_sfc, inSituThermalExpansionCoeff,        &
+         BruntVaisalaFreqTop, uw_sfc, vw_sfc, -wt_sfc, ws_sfc, inSituThermalExpansionCoeff,        &
           inSituSalineContractionCoeff, fCell, dThreshMLD)
 
+     utend(:,:) = (velocityZonal(:,:) - utend(:,:)) / dt
+     vtend(:,:) = (velocityMeridional(:,:) - vtend(:,:)) / dt
         !need to add interpolation back to N. Velocity!
      if ( config_adc_use_single_column ) THEN
        !$omp do schedule(runtime)
        do iCell = 2, nCells
          activeTracers(:,:,iCell) = activeTracers(:,:,1)
-         velocityZonal(:,iCell) = velocityZonal(:,1)
-         velocityMeridional(:,iCell) = velocityMeridional(:,1)
+         utend(:,iCell) = utend(:,1)
+         vtend(:,iCell) = vtend(:,1)
        end do
        !$omp end do
      end if
@@ -345,16 +356,17 @@ contains
        cell1 = cellsOnEdge(1,iEdge)
        cell2 = cellsOnEdge(2,iEdge)
 
-       zonalAverage = 0.5_RKIND*(velocityZonal(:,cell1) + velocityZonal(:,cell2))
-       meridionalAverage = 0.5_RKIND*(velocityMeridional(:,cell1) + velocityMeridional(:,cell2))
+       zonalAverage = 0.5_RKIND*(utend(:,cell1) + utend(:,cell2))
+       meridionalAverage = 0.5_RKIND*(vtend(:,cell1) + vtend(:,cell2))
 
-       normalVelocity(:,iEdge) = cos(angleEdge(iEdge)) * zonalAverage + sin(angleEdge(iEdge))  &
-                                    * meridionalAverage
+       normalVelocity(:,iEdge) = normalVelocity(:,iEdge) + dt*(cos(angleEdge(iEdge)) * zonalAverage &
+                + sin(angleEdge(iEdge)) * meridionalAverage)
      end do
      !$omp end do
 
      deallocate(zonalAverage, meridionalAverage, uw_sfc)
      deallocate(vw_sfc, ws_sfc, wt_sfc)
+     deallocate(utend,vtend,ttend,stend)
          !--------------------------------------------------------------------
 
    end subroutine ocn_vmix_adc_mix!}}}
