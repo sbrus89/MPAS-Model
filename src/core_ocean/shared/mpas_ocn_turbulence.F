@@ -155,7 +155,7 @@ module ocn_turbulence
       c11 = 0.1_RKIND
       alpha1 = 0.984_RKIND
       alpha2 = 0.568_RKIND
-      alpha3 = 0.29_RKIND
+      alpha3 = 0.8_RKIND
       B1 = 16.6_RKIND
       Kt = 0.4_RKIND
       c_1 = config_adc_c1
