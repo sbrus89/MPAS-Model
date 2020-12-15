@@ -329,17 +329,17 @@ contains
        local_nCells = nCells
      endif
 
-     utend(:,:) = velocityZonal(:,:)
-     vtend(:,:) = velocityMeridional(:,:)
-     ttend(:,:) = activeTracers(1,:,:)
-     stend(:,:) = activeTracers(2,:,:)
+     utend(:,:nCells) = velocityZonal(:,:nCells)
+     vtend(:,:nCells) = velocityMeridional(:,:nCells)
+     ttend(:,:nCells) = activeTracers(1,:,:nCells)
+     stend(:,:nCells) = activeTracers(2,:,:nCells)
 
      call compute_ADC_tends(local_nCells, nVertLevels, ntracers, dt, activeTracers, velocityZonal, velocityMeridional, &
          BruntVaisalaFreqTop, uw_sfc, vw_sfc, -wt_sfc, ws_sfc, inSituThermalExpansionCoeff,        &
           inSituSalineContractionCoeff, fCell, dThreshMLD)
 
-     utend(:,:) = (velocityZonal(:,:) - utend(:,:)) / dt
-     vtend(:,:) = (velocityMeridional(:,:) - vtend(:,:)) / dt
+     utend(:,:nCells) = (velocityZonal(:,:nCells) - utend(:,:nCells)) / dt
+     vtend(:,:nCells) = (velocityMeridional(:,:nCells) - vtend(:,:nCells)) / dt
         !need to add interpolation back to N. Velocity!
      if ( config_adc_use_single_column ) THEN
        !$omp do schedule(runtime)
