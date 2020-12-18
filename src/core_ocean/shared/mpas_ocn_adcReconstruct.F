@@ -401,7 +401,7 @@ module ocn_adc_mixing_fused
               w2tend2(k,iCell) = -(w3(i1,k-1,iCell) - w3(i1,k,iCell)) / dzmid
               w2tend3(k,iCell) = KE / (1.0E-15_RKIND + c_pv*2.0*sqrt(2.0_RKIND)* &
                 length(k,iCell))*(u2(i1,k,iCell) + v2(i1,k,iCell))/3.0_RKIND
-              w2tend4(k,iCell) = 2.0_RKIND*Mc(k,iCell)*Swup + 4.0_RKIND / &
+              w2tend4(k,iCell) = 2.0_RKIND*Mc(k,iCell)*Swup - 4.0_RKIND / &
                 3.0_RKIND*C_2*areaFraction(k,iCell)*(1.0_RKIND -          &
                 areaFraction(k,iCell))*wumd(k,iCell)*(grav*     &
                 alphaT(k,iCell)*tumd(k,iCell) - grav*betaS(k,iCell)*      &
@@ -455,9 +455,9 @@ module ocn_adc_mixing_fused
                 wstend3(k,iCell) + wstend4(k,iCell) + wstend5(k,iCell)
 
               uwtend1(k,iCell) = -(uw2(k-1,iCell) - uw2(k,iCell)) / dzmid
-              uwtend2(k,iCell) = 0.5*((0.8)*0.5*KE**2.0 +  &
-                0.0*(alpha1 - alpha2)*u2(i1,k,iCell) + (0.0*alpha1 +  &
-                alpha2*0.0 - 2.0_RKIND)*w2(i1,k,iCell))*Uz
+              uwtend2(k,iCell) = 0.5*((0.8 - 2.0*alpha1/3.0)*0.5*KE**2.0 +  &
+                (alpha1 - alpha2)*u2(i1,k,iCell) + (alpha1 +  &
+                alpha2 - 2.0_RKIND)*w2(i1,k,iCell))*Uz
               uwtend3(k,iCell) = 0.5_RKIND*(alpha1 - alpha2)*    &
                 uv(i1,k,iCell)*Vz
               uwtend4(k,iCell) = beta5*grav*(alphaT(k,iCell)*   &
@@ -470,9 +470,9 @@ module ocn_adc_mixing_fused
                 uwtend3(k,iCell) + uwtend4(k,iCell) + uwtend5(k,iCell)
 
               vwtend(k,iCell) = (-(vw2(k-1,iCell) - vw2(k,iCell)) / dzmid +   &
-                0.5_RKIND*((0.8_RKIND)*0.5_RKIND*KE**2.0_RKIND +  &
-                (alpha1 - alpha2)*0.0*v2(i1,k,iCell) + (0.0*alpha1 -   &
-                alpha2*0.0 - 2.0_RKIND)*w2(i1,k,iCell))*Vz + 0.5_RKIND*(alpha1 &
+                0.5_RKIND*((0.8_RKIND - 2.0*alpha1/3.0)*0.5_RKIND*KE**2.0_RKIND +  &
+                (alpha1 - alpha2)*v2(i1,k,iCell) + (alpha1 -   &
+                alpha2 - 2.0_RKIND)*w2(i1,k,iCell))*Vz + 0.5_RKIND*(alpha1 &
                 - alpha2)*uv(i1,k,iCell)*Uz + beta5*grav*       &
                 (alphaT(k,iCell)*vt(i1,k,iCell) - betaS(k,iCell)*vs(i1,k,iCell))) -            &
                 taupv(k,iCell)*vw(i1,k,iCell) + kappa_FL*(vw(i1,k-1,iCell) &
@@ -485,7 +485,7 @@ module ocn_adc_mixing_fused
                 (ze(k-1,iCell) - ze(k+1,iCell))**2.0_RKIND
 
               u2tend1(k,iCell) = -(u2w(k-1,iCell) - u2w(k,iCell)) / dzmid
-              u2tend2(k,iCell) = (1.0_RKIND/3.0_RKIND*alpha1 + alpha2 - &
+              u2tend2(k,iCell) = (1.0_RKIND/3.0_RKIND*alpha1 - alpha2 - &
                 2.0_RKIND)*uw(i1,k,iCell)*Uz
               u2tend3(k,iCell) = - 2.0_RKIND/3.0_RKIND*alpha1*vw(i1,k,iCell)*Vz
               u2tend4(k,iCell) = 2.0_RKIND/3.0_RKIND*(1.0_RKIND-beta5)*B
@@ -498,7 +498,7 @@ module ocn_adc_mixing_fused
                 u2tend3(k,iCell) + u2tend4(k,iCell) + u2tend5(k,iCell)
 
               v2tend1(k,iCell) = -(v2w(k-1,iCell) - v2w(k,iCell)) / dzmid
-              v2tend2(k,iCell) = (1.0_RKIND/3.0_RKIND*alpha1 +alpha2 - &
+              v2tend2(k,iCell) = (1.0_RKIND/3.0_RKIND*alpha1 - alpha2 - &
                 2.0_RKIND)*vw(i1,k,iCell)*Vz
               v2tend3(k,iCell) = - 2.0_RKIND/3.0_RKIND*alpha1*uw(i1,k,iCell)*Uz
               v2tend4(k,iCell) = 2.0_RKIND/3.0_RKIND*(1-beta5)*B
