@@ -47,7 +47,7 @@
 			description="c_1 dissipation constant, value from Bougeault and Andre 1986"
 			possible_values="values near 4.0"
 		/>
-		<nml_option name="config_adc_c2" type="real" default_value="-0.5" units="unitless"
+		<nml_option name="config_adc_c2" type="real" default_value="0.5" units="unitless"
 			description="c_2 dissipation constant, value from Bougeault and Andre 1986"
 			possible_values="values near -0.5"
       />

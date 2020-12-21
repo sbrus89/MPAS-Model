@@ -30,12 +30,14 @@ module ocn_adc_mixing_fused
     real,dimension(nVertLevels) :: B, Bup, Bdo
     real,dimension(nVertLevels+1) :: tke, BupEdge, BdoEdge
     real :: sav, tudav, sudav, Tup, Tdo, Sup, Sdo
-    real :: s1, z1, zV, sumv, minlen
+    real :: KEsps, s1, z1, zV, sumv, minlen
 
     !NOTE: will need to convert to some form of displaced density in the mpas framework soon
     !possibly go back to a more traditional length scale formulation
     do iCell=1,nCells
-       tke(:) = 0.5*(u2(i1,:,iCell) + v2(i1,:,iCell) + w2(i1,:,iCell))
+      KEsps = areaFraction(:,iCell)*KspsU(i1,:,iCell) + (1.0_RKIND - areaFraction(:,iCell))*KspsD(i1,:,iCell)
+      tke(:) = 0.5*(u2(i1,:,iCell) + v2(i1,:,iCell) + w2(i1,:,iCell)) ! + KEsps
+        
        do k=1,nVertLevels
           B(k) = -9.806*(-alphaT(k,iCell)*(activeTracers(1,k,iCell) - 15.0_RKIND) + betaS(k,iCell)*   &
                     (activeTracers(2,k,iCell) - 35.0_RKIND))
@@ -309,8 +311,7 @@ module ocn_adc_mixing_fused
               w2k = areaFraction(k,iCell)*(1.0_RKIND - areaFraction(k,iCell))*wumd(k,iCell)**2.0
               w2kp1 = areaFraction(k+1,iCell)*(1.0_RKIND - areaFraction(k+1,iCell))* &
                 wumd(k+1,iCell)**2.0
-              w3tend3(k,iCell) = 3.0_RKIND*(sigav*(1.0_RKIND - sigav)*wumdav**2.0* &
-                                (w2k - w2kp1) / dz)
+              w3tend3(k,iCell) = 1.5_RKIND*(w2k**2.0 - w2kp1**2.0) / dz
               !  w3tend2(k,iCell) =  -wumdav**3.0*(6.0*sigav**2.0 - 6.0*sigav + 1)*             &
             !        (areaFraction(k,iCell)*(1.0_RKIND - areaFraction(k,iCell))*  &
             !        wumd(k,iCell) - areaFraction(k+1,iCell)*(1.0_RKIND - &
@@ -320,7 +321,7 @@ module ocn_adc_mixing_fused
             !        wumd(k,iCell)**2.0_RKIND - (1.0_RKIND -                                &
             !        2.0_RKIND*areaFraction(k+1,iCell))*wumd(k+1,iCell)**2.0_RKIND) / dz
               w3tend4(k,iCell) = 3.0_RKIND*(1.0_RKIND - 2.0_RKIND*sigav)*Mcav*wumdav*Swup -          &
-                    C_mom_w3*KE / (1E-15_RKIND+ 2.0_RKIND*sqrt(2.0_RKIND)*lenAv)*w3(i1,k,iCell)
+                    C_mom_w3*KE / (1E-15_RKIND+ sqrt(2.0_RKIND)*lenAv)*w3(i1,k,iCell)
               w3tend5(k,iCell) = 3.0_RKIND*grav*(alphaT(k,iCell)*w2t(k,iCell) - &
                     betaS(k,iCell)*w2s(k,iCell))*0.9_RKIND
 
@@ -455,13 +456,13 @@ module ocn_adc_mixing_fused
                 wstend3(k,iCell) + wstend4(k,iCell) + wstend5(k,iCell)
 
               uwtend1(k,iCell) = -(uw2(k-1,iCell) - uw2(k,iCell)) / dzmid
-              uwtend2(k,iCell) = 0.5*((0.8 - 2.0*alpha1/3.0)*0.5*KE**2.0 +  &
+              uwtend2(k,iCell) = 0.5*((0.8 - 4.0*alpha1/3.0)*0.5*KE**2.0 +  &
                 (alpha1 - alpha2)*u2(i1,k,iCell) + (alpha1 +  &
                 alpha2 - 2.0_RKIND)*w2(i1,k,iCell))*Uz
               uwtend3(k,iCell) = 0.5_RKIND*(alpha1 - alpha2)*    &
                 uv(i1,k,iCell)*Vz
               uwtend4(k,iCell) = beta5*grav*(alphaT(k,iCell)*   &
-                ut(i1,k,iCell) + betaS(k,iCell)*us(i1,k,iCell))
+                ut(i1,k,iCell) - betaS(k,iCell)*us(i1,k,iCell))
               uwtend5(k,iCell) = -taupv(k,iCell)*uw(i1,k,iCell) + &
                 kappa_FL*(uw(i1,k-1,iCell) - uw(i1,k+1,iCell)) / &
                 (ze(k-1,iCell) - ze(k+1,iCell))**2.0
@@ -470,7 +471,7 @@ module ocn_adc_mixing_fused
                 uwtend3(k,iCell) + uwtend4(k,iCell) + uwtend5(k,iCell)
 
               vwtend(k,iCell) = (-(vw2(k-1,iCell) - vw2(k,iCell)) / dzmid +   &
-                0.5_RKIND*((0.8_RKIND - 2.0*alpha1/3.0)*0.5_RKIND*KE**2.0_RKIND +  &
+                0.5_RKIND*((0.8_RKIND - 4.0*alpha1/3.0)*0.5_RKIND*KE**2.0_RKIND +  &
                 (alpha1 - alpha2)*v2(i1,k,iCell) + (alpha1 -   &
                 alpha2 - 2.0_RKIND)*w2(i1,k,iCell))*Vz + 0.5_RKIND*(alpha1 &
                 - alpha2)*uv(i1,k,iCell)*Uz + beta5*grav*       &
@@ -687,11 +688,13 @@ module ocn_adc_mixing_fused
                    if (eps(i2,k,iCell) < 1.0E-10_RKIND) then
                       eps(i2,k,iCell) = 1.0E-10_RKIND
                    endif
+                   !Amrapalli: 16.6 here can be tuned if needed, would show up in u2 and v2 primarily
+                   ! also in KEspsU/D
                    KE = 0.5_RKIND*(u2(i2,k,iCell) + v2(i2,k,iCell) + w2(i2,k,iCell))
-                   length(k,iCell) = KE**1.5 / eps(i2,k,iCell)
+                   length(k,iCell) = KE**1.5 / 16.6*eps(i2,k,iCell)
                  else
                    KE = 0.5_RKIND*(u2(i2,k,iCell) + v2(i2,k,iCell) + w2(i2,k,iCell))
-                   eps(:,k,iCell) = KE**1.5 / length(k,iCell)
+                   eps(:,k,iCell) = KE**1.5 / 16.6*length(k,iCell)
                  endif
                 KspsU(i2,k,iCell) = max(epsilon,KspsU(i1,k,iCell) + dt_small*KspsUtend(k,iCell))
                 KspsD(i2,k,iCell) = max(epsilon,KspsD(i1,k,iCell) + dt_small*KspsDtend(k,iCell))
