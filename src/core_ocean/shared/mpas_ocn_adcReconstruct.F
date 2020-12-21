@@ -28,15 +28,15 @@ module ocn_adc_mixing_fused
     integer :: iCell, k, ij, i
 
     real,dimension(nVertLevels) :: B, Bup, Bdo
-    real,dimension(nVertLevels+1) :: tke, BupEdge, BdoEdge
+    real,dimension(nVertLevels+1) :: KEsps, tke, BupEdge, BdoEdge
     real :: sav, tudav, sudav, Tup, Tdo, Sup, Sdo
-    real :: KEsps, s1, z1, zV, sumv, minlen
+    real :: s1, z1, zV, sumv, minlen
 
     !NOTE: will need to convert to some form of displaced density in the mpas framework soon
     !possibly go back to a more traditional length scale formulation
     do iCell=1,nCells
-      KEsps = areaFraction(:,iCell)*KspsU(i1,:,iCell) + (1.0_RKIND - areaFraction(:,iCell))*KspsD(i1,:,iCell)
-      tke(:) = 0.5*(u2(i1,:,iCell) + v2(i1,:,iCell) + w2(i1,:,iCell)) ! + KEsps
+      KEsps(:) = areaFraction(:,iCell)*KspsU(i1,:,iCell) + (1.0_RKIND - areaFraction(:,iCell))*KspsD(i1,:,iCell)
+      tke(:) = 0.5*(u2(i1,:,iCell) + v2(i1,:,iCell) + w2(i1,:,iCell)) ! + KEsps(:)
         
        do k=1,nVertLevels
           B(k) = -9.806*(-alphaT(k,iCell)*(activeTracers(1,k,iCell) - 15.0_RKIND) + betaS(k,iCell)*   &
