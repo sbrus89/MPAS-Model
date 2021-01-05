@@ -225,7 +225,7 @@ module ocn_adc_mixing_fused
             w3av = 0.5_RKIND*(w3(i1,k-1,iCell) + w3(i1,k,iCell))
 
             Sw = w3av / (max(w2(i1,k,iCell)**1.5_RKIND,epsilon))
-            lareaFraction = 0.5_RKIND - 0.5_RKIND*Sw**2.0 / sqrt(4.0_RKIND + Sw**2)
+            lareaFraction = 0.5_RKIND - 0.5_RKIND*Sw / sqrt(4.0_RKIND + Sw**2)
 
             if(lareaFraction < 0.01_RKIND) lareaFraction = 0.01_RKIND
             if(lareaFraction > 0.99_RKIND) lareaFraction = 0.99_RKIND
