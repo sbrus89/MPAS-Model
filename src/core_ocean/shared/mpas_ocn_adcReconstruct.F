@@ -216,8 +216,7 @@ module ocn_adc_mixing_fused
           sigav = 0.5_RKIND*(areaFraction(1,iCell) + areaFraction(2,iCell))
           wtav = 0.5_RKIND*(wt(i1,1,iCell) + wt(i1,2,iCell))
           McAv = 0.5_RKIND*(w2(i1,1,iCell) + w2(i1,2,iCell))
-          w2t(1,iCell) = (1.0_RKIND - 2.0_RKIND*sigav)*wtav*sqrt(McAv) / (EPSILON + &
-                         sigav*(1.0_RKIND-sigav))
+          w2t(1,iCell) = (1.0_RKIND - 2.0_RKIND*sigav)*wtav*sqrt(McAv / (sigav*(1.0_RKIND-sigav)))
         enddo
 
         !Kernel 1 inlined versions of the base arrays, needed for later to make them collapsible
@@ -226,7 +225,7 @@ module ocn_adc_mixing_fused
             w3av = 0.5_RKIND*(w3(i1,k-1,iCell) + w3(i1,k,iCell))
 
             Sw = w3av / (max(w2(i1,k,iCell)**1.5_RKIND,epsilon))
-            lareaFraction = 0.5_RKIND - 0.5_RKIND*Sw / sqrt(4.0_RKIND + Sw**2.0_RKIND)
+            lareaFraction = 0.5_RKIND - 0.5_RKIND*Sw**2.0 / sqrt(4.0_RKIND + Sw**2)
 
             if(lareaFraction < 0.01_RKIND) lareaFraction = 0.01_RKIND
             if(lareaFraction > 0.99_RKIND) lareaFraction = 0.99_RKIND
