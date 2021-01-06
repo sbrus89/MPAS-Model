@@ -66,73 +66,39 @@ module ocn_adc_mixing_fused
        BdoEdge(1) = BdoEdge(2)
        BupEdge(1) = BupEdge(2)
 
+       !This new formulation looks to how far an unstable parcel can move vertically before stabilizing
        do k=2,nVertLevels
 
           sumv = 0
-          ij=k
+          ij=k+1
           lenup(k,iCell) = 0.0_RKIND
-          do while(sumv <= tke(k) .and. ij < nVertLevels+1)
-             sumv = sumv + (BupEdge(k) - Bup(ij))*(ze(ij-1,iCell)-ze(ij,iCell))
-             lenup(k,iCell) =  lenup(k,iCell) + abs(ze(ij-1,iCell)-ze(ij,iCell))
-             ij = ij + 1
+          do while(ij <= nVertLevels+1 .and. BupEdge(k) < BupEdge(ij))
+            lenup(k,iCell) =  lenup(k,iCell) + abs(ze(ij-1,iCell)-ze(ij,iCell)) 
+            ij = ij + 1
+          end do
 
-             if(sumv > tke(k)) THEN
-                ij = ij - 1
-                s1 = sumv
-                z1 = ze(ij,iCell)
-                zV = ze(ij-1,iCell)
-
-                sumv = sumv - (BupEdge(k) - Bup(ij))*(ze(ij-1,iCell)-ze(ij,iCell))
-                lenup(k,iCell) = lenup(k,iCell) - abs(ze(ij,iCell)-ze(ij+1,iCell))
-                lenup(k,iCell) = max(0.55,lenup(k,iCell) + abs((z1-zV)/(s1 - sumv)*(tke(k)-sumv)))
-            !    if(Bup(k-1) - Bup(k) < 0) then
-            !            minlen = abs(zm(k-1,i) - zm(k,i))
-            !    else
-            !            minlen = 0.5_RKIND
-            !    endif
-            !    if(k==5) then
-            !      print *, 'len pre = ',lenup(k,i)
-            !    endif
-!
-!                lenup(k,i) = max(minlen, lenup(k,i) + tke(k)/(1.0E-15 + sumv - (BupEdge(k) -         &
-!                                Bup(ij))))
-!                              if(k==5) then
-!                                print *, lenup(k,i),minlen, tke(k)
-!                              endif
-                              exit
-             endif
-
-         end do
+          z1 = (ze(ij-1,iCell) - ze(ij,iCell)) / (1E-15+BupEdge(ij-1) - BupEdge(ij)) * (BupEdge(k) - BupEdge(ij-1))
+          lenup(k,iCell) = max(0.55_RKIND, lenup(k,iCell) + z1)
 
         !find lendown
         sumv = 0
-        ij=k
+        ij=k-1
         lendn(k,iCell) = 0.0_RKIND
-        do while(sumv <= tke(k) .and. ij>1)
-           sumv = sumv - (BdoEdge(k) - Bdo(ij-1))*(ze(ij-1,iCell)-ze(ij,iCell))
-           lendn(k,iCell) = lendn(k,iCell) + abs(ze(ij-1,iCell)-ze(ij,iCell))
+        do while(ij > 1 .and. BdoEdge(k) > BdoEdge(ij))
+           lendn(k,iCell) = lendn(k,iCell) + abs(ze(ij,iCell)-ze(ij+1,iCell))
            ij = ij - 1
+        end do
 
-           if(sumv > tke(k)) THEN
-              ij = ij + 1
-              s1 = sumv
-              z1 = ze(ij,iCell)
-              zV = ze(ij-1,iCell)
-              sumv = sumv + (BdoEdge(k) - Bdo(ij-1))*(ze(ij-1,iCell)-ze(ij,iCell))
-              lendn(k,iCell) = lendn(k,iCell) - abs(ze(ij-1,iCell)-ze(ij,iCell))
-              lendn(k,iCell) = max(0.55,lendn(k,iCell) + ((zV-z1)/(s1 - sumv)*(tke(k) - sumv)))
-
-           exit
-           endif
-        enddo
+        z1 = (ze(ij,iCell) - ze(ij+1,iCell)) / (1E-15+BdoEdge(ij) - BdoEdge(ij+1)) * (BdoEdge(k) - BdoEdge(ij+1)) 
+        lendn(k,iCell) = max(0.55, lendn(k,iCell) + z1)
 
         length(k,iCell) = (2.0_RKIND*lenup(k,iCell)*lendn(k,iCell))  &
           / (lenup(k,iCell) + lendn(k,iCell))
       enddo
    enddo
 
-   length(1,iCell) = 0.55_RKIND
-   length(nVertLevels+1,iCell) = 0.55_RKIND
+   length(1,:) = 0.55_RKIND
+   length(nVertLevels+1,:) = 0.55_RKIND
 
   end subroutine dissipation_lengths2
 
@@ -182,7 +148,7 @@ module ocn_adc_mixing_fused
         Q = grav*(alphaT(1,iCell)*wtsfc(iCell) - betaS(1,iCell)*wssfc(iCell))* &
             boundaryLayerDepth(iCell)
         if(Q > 0) then
-          wstar = abs(0.4_RKIND*Q)**(1.0/3.0)
+          wstar = abs(Q)**(1.0/3.0)
         else
           wstar = 0.0
         endif
@@ -303,7 +269,7 @@ module ocn_adc_mixing_fused
                     (1.0_RKIND - 3.0_RKIND*areaFraction(k,iCell) + 3.0_RKIND* &
                     areaFraction(k,iCell)**2.0)*wumd(k,iCell)**4.0
               w4kp1 = areaFraction(k+1,iCell)*(1.0_RKIND - areaFraction(k+1,iCell))* &
-                    (1.0_RKIND - 3.0_RKIND*areaFraction(k,iCell) + 3.0_RKIND* &
+                    (1.0_RKIND - 3.0_RKIND*areaFraction(k+1,iCell) + 3.0_RKIND* &
                     areaFraction(k+1,iCell)**2.0)*wumd(k+1,iCell)**4.0
               w3tend2(k,iCell) = -(w4k - w4kp1) / dz
               !now the w3term
