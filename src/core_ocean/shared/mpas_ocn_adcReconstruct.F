@@ -60,11 +60,11 @@ module ocn_adc_mixing_fused
           endif
        enddo
 
-       BdoEdge(nVertLevels+1) = BdoEdge(nVertLevels)
-       BupEdge(nVertLevels+1) = BupEdge(nVertLevels)
+       BdoEdge(nVertLevels+1) = Bdo(nVertLevels)
+       BupEdge(nVertLevels+1) = Bup(nVertLevels)
 
-       BdoEdge(1) = BdoEdge(2)
-       BupEdge(1) = BupEdge(2)
+       BdoEdge(1) = Bdo(1)
+       BupEdge(1) = Bup(1)
 
        !This new formulation looks to how far an unstable parcel can move vertically before stabilizing
        do k=2,nVertLevels
@@ -72,29 +72,32 @@ module ocn_adc_mixing_fused
           sumv = 0
           ij=k+1
           lenup(k,iCell) = 0.0_RKIND
-          do while(ij <= nVertLevels+1 .and. BupEdge(k) < BupEdge(ij))
+          do while(ij <= nVertLevels+1 .and. BupEdge(k) < BupEdge(ij) + 1e-5)
             lenup(k,iCell) =  lenup(k,iCell) + abs(ze(ij-1,iCell)-ze(ij,iCell)) 
             ij = ij + 1
           end do
 
-          z1 = (ze(ij-1,iCell) - ze(ij,iCell)) / (1E-15+BupEdge(ij-1) - BupEdge(ij)) * (BupEdge(k) - BupEdge(ij-1))
+          z1 = min(ze(ij-1,iCell) - ze(ij,iCell), (ze(ij-1,iCell) - ze(ij,iCell)) / &
+                  (1E-15+BupEdge(ij-1) - BupEdge(ij)) * (BupEdge(k) - BupEdge(ij-1)))
           lenup(k,iCell) = max(0.55_RKIND, lenup(k,iCell) + z1)
 
         !find lendown
         sumv = 0
         ij=k-1
         lendn(k,iCell) = 0.0_RKIND
-        do while(ij > 1 .and. BdoEdge(k) > BdoEdge(ij))
+        do while(ij > 1 .and. BdoEdge(k) > BdoEdge(ij) + 1E-5)
            lendn(k,iCell) = lendn(k,iCell) + abs(ze(ij,iCell)-ze(ij+1,iCell))
            ij = ij - 1
         end do
 
-        z1 = (ze(ij,iCell) - ze(ij+1,iCell)) / (1E-15+BdoEdge(ij) - BdoEdge(ij+1)) * (BdoEdge(k) - BdoEdge(ij+1)) 
+        z1 = min(ze(ij,iCell) - ze(ij+1,iCell),-((ze(ij,iCell) - ze(ij+1,iCell)) / &
+                  (1E-15+BdoEdge(ij) - BdoEdge(ij+1)) * (BdoEdge(k) - BdoEdge(ij))))
         lendn(k,iCell) = max(0.55, lendn(k,iCell) + z1)
 
         length(k,iCell) = (2.0_RKIND*lenup(k,iCell)*lendn(k,iCell))  &
           / (lenup(k,iCell) + lendn(k,iCell))
       enddo
+
    enddo
 
    length(1,:) = 0.55_RKIND
@@ -159,9 +162,6 @@ module ocn_adc_mixing_fused
         Mc(1,iCell) = 0.0_RKIND
         w2t(1,iCell) = -0.3_RKIND*wstar * wtsfc(iCell)
         w2s(1,iCell) = 0.3_RKIND*wstar * wssfc(iCell)
-
-        length(nVertLevels+1,iCell) = 1e-15_RKIND
-        length(1,iCell) = ze(1,iCell) - ze(2,iCell)
 
         sfcFrictionVelocity = sqrt(uwsfc(iCell)**2 + vwsfc(iCell)**2)
         do k=1,2
@@ -656,10 +656,10 @@ module ocn_adc_mixing_fused
                    !Amrapalli: 16.6 here can be tuned if needed, would show up in u2 and v2 primarily
                    ! also in KEspsU/D
                    KE = 0.5_RKIND*(u2(i2,k,iCell) + v2(i2,k,iCell) + w2(i2,k,iCell))
-                   length(k,iCell) = KE**1.5 / 16.6*eps(i2,k,iCell)
+                   length(k,iCell) = KE**1.5 / (16.6*eps(i2,k,iCell))
                  else
                    KE = 0.5_RKIND*(u2(i2,k,iCell) + v2(i2,k,iCell) + w2(i2,k,iCell))
-                   eps(:,k,iCell) = KE**1.5 / 16.6*length(k,iCell)
+                   eps(:,k,iCell) = KE**1.5 / (16.6*length(k,iCell))
                  endif
                 KspsU(i2,k,iCell) = max(epsilon,KspsU(i1,k,iCell) + dt_small*KspsUtend(k,iCell))
                 KspsD(i2,k,iCell) = max(epsilon,KspsD(i1,k,iCell) + dt_small*KspsDtend(k,iCell))
