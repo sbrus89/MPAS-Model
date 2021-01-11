@@ -354,7 +354,11 @@ module ocn_adc_mixing_fused
 
               w2tend1(k,iCell) = -wumd(k,iCell)**2.0_RKIND*(         &
                 Entrainment(k,iCell) + Detrainment(k,iCell))
-              w2tend2(k,iCell) = -(w3(i1,k-1,iCell) - w3(i1,k,iCell)) / dzmid
+              w2tend2(k,iCell) = -(Mc(k-1,iCell)*(1.0_RKIND - 2.0_RKIND*    &
+                areaFraction(k,iCell))*wumd(k,iCell)**2.0 - Mc(k+1,iCell)* &
+                (1.0_RKIND - 2.0_RKIND*areaFraction(k+1,iCell))*wumd(k+1,iCell)**2.0) &
+                / (ze(k-1,iCell) - ze(k+1,iCell))
+              !w2tend2(k,iCell) = -(w3(i1,k-1,iCell) - w3(i1,k,iCell)) / dzmid
               w2tend3(k,iCell) = KE / (1.0E-15_RKIND + c_pv*2.0*sqrt(2.0_RKIND)* &
                 length(k,iCell))*(u2(i1,k,iCell) + v2(i1,k,iCell))/3.0_RKIND
               w2tend4(k,iCell) = (2.0_RKIND - 4.0_RKIND/3.0_RKIND*C_2)*Mc(k,iCell)* &
@@ -371,14 +375,18 @@ module ocn_adc_mixing_fused
               taupv(k,iCell) = KE / (2.0*sqrt(2.0)*c_pv*length(k,iCell))
 
               wttend1(k,iCell) = -(Entrainment(k,iCell) + Detrainment(k,iCell)) * &
-                wumd(k,iCell)*tumd(k,iCell) - (w2t(k-1,iCell) - w2t(k,iCell)) / dzmid
-              wttend2(k,iCell) = -w2(i1,k,iCell)*Tz
+                wumd(k,iCell)*tumd(k,iCell)
+              wttend2(k,iCell) = -((1.0_RKIND - 2.0_RKIND*areaFraction(k-1,iCell))* &
+                wumd(k-1,iCell)*tumd(k-1,iCell)*Mc(k-1,iCell) - (1.0_RKIND - 2.0_RKIND* &
+                areaFraction(k+1,iCell))*wumd(k+1,iCell)*tumd(k+1,iCell)*Mc(k+1,iCell)) &
+                / (zedge(k-1,iCell) - zedge(k+1,iCell)) - Mc(k,iCell)*wumd(k,iCell)*Tz
               wttend3(k,iCell) = (1.0_RKIND - gamma1)*grav*(alphaT(k,iCell) &
-                *t2(i1,k,iCell) - betaS(k,iCell)*ts(i1,k,iCell))
+                *tumd(k,iCell)**2.0 - betaS(k,iCell)*tumd(k,iCell)*sumd(k,iCell))
               wttend4(k,iCell) = -alpha3/4.0*(ut(i1,k,iCell)*Uz + &
                 vt(i1,k,iCell)*Vz)
               wttend5(k,iCell) = kappa_FL*(wt(i1,k-1,iCell) -       &
                     wt(i1,k+1,iCell)) / (ze(k-1,iCell) - ze(k+1,iCell))**2.0
+!              wttend6(k,iCell) = areaFraction(k,iCell)*(1.0_RKIND - areaFraction(k,iCell))*
               wttend6(k,iCell) = areaFraction(k,iCell)*(1.0_RKIND - areaFraction(k,iCell))* &
                     wumd(k,iCell)*(1.0_RKIND/areaFraction(k,iCell)*((areaFraction(k-1,iCell)* &
                     wt_spsU(k-1,iCell) - areaFraction(k+1,iCell)*wt_spsU(k+1,iCell)) / &
