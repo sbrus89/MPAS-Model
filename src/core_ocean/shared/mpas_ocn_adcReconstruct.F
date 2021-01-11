@@ -355,7 +355,7 @@ module ocn_adc_mixing_fused
               w2tend1(k,iCell) = -wumd(k,iCell)**2.0_RKIND*(         &
                 Entrainment(k,iCell) + Detrainment(k,iCell))
               w2tend2(k,iCell) = -(Mc(k-1,iCell)*(1.0_RKIND - 2.0_RKIND*    &
-                areaFraction(k,iCell))*wumd(k,iCell)**2.0 - Mc(k+1,iCell)* &
+                areaFraction(k-1,iCell))*wumd(k-1,iCell)**2.0 - Mc(k+1,iCell)* &
                 (1.0_RKIND - 2.0_RKIND*areaFraction(k+1,iCell))*wumd(k+1,iCell)**2.0) &
                 / (ze(k-1,iCell) - ze(k+1,iCell))
               !w2tend2(k,iCell) = -(w3(i1,k-1,iCell) - w3(i1,k,iCell)) / dzmid
