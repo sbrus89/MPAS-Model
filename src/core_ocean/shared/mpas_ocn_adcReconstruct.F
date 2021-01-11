@@ -379,7 +379,7 @@ module ocn_adc_mixing_fused
               wttend2(k,iCell) = -((1.0_RKIND - 2.0_RKIND*areaFraction(k-1,iCell))* &
                 wumd(k-1,iCell)*tumd(k-1,iCell)*Mc(k-1,iCell) - (1.0_RKIND - 2.0_RKIND* &
                 areaFraction(k+1,iCell))*wumd(k+1,iCell)*tumd(k+1,iCell)*Mc(k+1,iCell)) &
-                / (zedge(k-1,iCell) - zedge(k+1,iCell)) - Mc(k,iCell)*wumd(k,iCell)*Tz
+                / (ze(k-1,iCell) - ze(k+1,iCell)) - Mc(k,iCell)*wumd(k,iCell)*Tz
               wttend3(k,iCell) = (1.0_RKIND - gamma1)*grav*(alphaT(k,iCell) &
                 *tumd(k,iCell)**2.0 - betaS(k,iCell)*tumd(k,iCell)*sumd(k,iCell))
               wttend4(k,iCell) = -alpha3/4.0*(ut(i1,k,iCell)*Uz + &
