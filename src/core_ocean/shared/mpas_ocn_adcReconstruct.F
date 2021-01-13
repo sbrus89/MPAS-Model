@@ -28,7 +28,7 @@ module ocn_adc_mixing_fused
     integer :: iCell, k, ij, i
 
     real,dimension(nVertLevels) :: B, Bup, Bdo
-    real,dimension(nVertLevels+1) :: KEsps, tke, BupEdge, BdoEdge
+    real,dimension(nVertLevels+1) :: tkedo, KEsps, tkeup, BupEdge, BEdge, BdoEdge
     real :: sav, tudav, sudav, Tup, Tdo, Sup, Sdo
     real :: s1, z1, zV, sumv, minlen
 
@@ -36,8 +36,11 @@ module ocn_adc_mixing_fused
     !possibly go back to a more traditional length scale formulation
     do iCell=1,nCells
       KEsps(:) = areaFraction(:,iCell)*KspsU(i1,:,iCell) + (1.0_RKIND - areaFraction(:,iCell))*KspsD(i1,:,iCell)
-      tke(:) = 0.5*(u2(i1,:,iCell) + v2(i1,:,iCell) + w2(i1,:,iCell)) ! + KEsps(:)
-        
+      tkeup(:) = 0.5_RKIND*w2(i1,:,iCell)*areaFraction(:,iCell) / (1.0_RKIND - areaFraction(:,iCell))
+      tkedo(:) = 0.5_RKIND*w2(i1,:,iCell)*(1.0_RKIND-areaFraction(:,iCell)) / areaFraction(:,iCell)
+
+      tkeup(:) = 0.5_RKIND*(u2(i1,:,iCell) + v2(i1,:,iCell) + w2(i1,:,iCell))
+      tkedo(:) = 0.5_RKIND*(u2(i1,:,iCell) + v2(i1,:,iCell) + w2(i1,:,iCell))
        do k=1,nVertLevels
           B(k) = -9.806*(-alphaT(k,iCell)*(activeTracers(1,k,iCell) - 15.0_RKIND) + betaS(k,iCell)*   &
                     (activeTracers(2,k,iCell) - 35.0_RKIND))
@@ -57,42 +60,41 @@ module ocn_adc_mixing_fused
           if(k>1) THEN
              BupEdge(k) = 0.5*(Bup(k-1) + Bup(k))
              BdoEdge(k) = 0.5*(Bdo(k-1) + Bdo(k))
+             BEdge(k) = 0.5*(B(k-1) + B(k))
           endif
        enddo
 
        BdoEdge(nVertLevels+1) = Bdo(nVertLevels)
        BupEdge(nVertLevels+1) = Bup(nVertLevels)
+       BEdge(nVertLevels+1) = B(nVertLevels)
 
        BdoEdge(1) = Bdo(1)
        BupEdge(1) = Bup(1)
+       BEdge(1) = B(1)
 
        !This new formulation looks to how far an unstable parcel can move vertically before stabilizing
        do k=2,nVertLevels
 
           sumv = 0
           ij=k+1
-          lenup(k,iCell) = 0.0_RKIND
-          do while(ij <= nVertLevels+1 .and. BupEdge(k) < BupEdge(ij) + 1e-5)
-            lenup(k,iCell) =  lenup(k,iCell) + abs(ze(ij-1,iCell)-ze(ij,iCell)) 
+          do while(ij <= nVertLevels+1 .and. BupEdge(k) - BEdge(ij) < tkeup(k))
             ij = ij + 1
           end do
 
-          z1 = min(ze(ij-1,iCell) - ze(ij,iCell), (ze(ij-1,iCell) - ze(ij,iCell)) / &
-                  (1E-15+BupEdge(ij-1) - BupEdge(ij)) * (BupEdge(k) - BupEdge(ij-1)))
-          lenup(k,iCell) = max(0.55_RKIND, lenup(k,iCell) + z1)
+          z1 = min(ze(ij,iCell), -(ze(ij-1,iCell) - ze(ij,iCell)) / &
+                  (1E-15+BEdge(ij) - BEdge(ij-1)) * (tkeup(k) - (BupEdge(k) - BEdge(ij-1))) + ze(ij,iCell))
+          lenup(k,iCell) = max(0.55_RKIND, abs(ze(k,iCell) - z1))
 
         !find lendown
         sumv = 0
         ij=k-1
-        lendn(k,iCell) = 0.0_RKIND
-        do while(ij > 1 .and. BdoEdge(k) > BdoEdge(ij) + 1E-5)
-           lendn(k,iCell) = lendn(k,iCell) + abs(ze(ij,iCell)-ze(ij+1,iCell))
+        do while(ij > 1 .and. BEdge(ij) - BdoEdge(k) < tkedo(k))
            ij = ij - 1
         end do
 
-        z1 = min(ze(ij,iCell) - ze(ij+1,iCell),-((ze(ij,iCell) - ze(ij+1,iCell)) / &
-                  (1E-15+BdoEdge(ij) - BdoEdge(ij+1)) * (BdoEdge(k) - BdoEdge(ij))))
-        lendn(k,iCell) = max(0.55, lendn(k,iCell) + z1)
+        z1 = min(ze(ij,iCell),-((ze(ij,iCell) - ze(ij+1,iCell)) / &
+                  (1E-15+BEdge(ij) - BEdge(ij+1)) * (tkedo(k) - (BEdge(k) - BdoEdge(ij)))) + ze(ij,iCell))
+        lendn(k,iCell) = max(0.55, abs(ze(k,iCell)-z1))
 
         length(k,iCell) = (2.0_RKIND*lenup(k,iCell)*lendn(k,iCell))  &
           / (lenup(k,iCell) + lendn(k,iCell))
@@ -192,7 +194,7 @@ module ocn_adc_mixing_fused
             w3av = 0.5_RKIND*(w3(i1,k-1,iCell) + w3(i1,k,iCell))
 
             Sw = w3av / (max(w2(i1,k,iCell)**1.5_RKIND,epsilon))
-            lareaFraction = 0.5_RKIND + 0.5_RKIND*Sw / sqrt(4.0_RKIND + Sw**2)
+            lareaFraction = 0.5_RKIND - 0.5_RKIND*Sw / sqrt(4.0_RKIND + Sw**2)
 
             if(lareaFraction < 0.01_RKIND) lareaFraction = 0.01_RKIND
             if(lareaFraction > 0.99_RKIND) lareaFraction = 0.99_RKIND
@@ -359,7 +361,7 @@ module ocn_adc_mixing_fused
                 (1.0_RKIND - 2.0_RKIND*areaFraction(k+1,iCell))*wumd(k+1,iCell)**2.0) &
                 / (ze(k-1,iCell) - ze(k+1,iCell))
               !w2tend2(k,iCell) = -(w3(i1,k-1,iCell) - w3(i1,k,iCell)) / dzmid
-              w2tend3(k,iCell) = KE / (1.0E-15_RKIND + c_pv*2.0*sqrt(2.0_RKIND)* &
+              w2tend3(k,iCell) = KE / (1.0E-15_RKIND + c_pv*sqrt(2.0_RKIND)* &
                 length(k,iCell))*(u2(i1,k,iCell) + v2(i1,k,iCell))/3.0_RKIND
               w2tend4(k,iCell) = (2.0_RKIND - 4.0_RKIND/3.0_RKIND*C_2)*Mc(k,iCell)* &
                 (grav*alphaT(k,iCell)*tumd(k,iCell) - grav*betaS(k,iCell)*sumd(k,iCell))
@@ -370,9 +372,9 @@ module ocn_adc_mixing_fused
               w2tend(k,iCell) = w2tend1(k,iCell) + w2tend2(k,iCell) + &
                 w2tend3(k,iCell) + w2tend4(k,iCell) + w2tend5(k,iCell)
 
-              taupt(k,iCell) = KE / (2.0*sqrt(2.0)*c_pt*length(k,iCell))
-              taups(k,iCell) = KE / (2.0*sqrt(2.0)*c_ps*length(k,iCell))
-              taupv(k,iCell) = KE / (2.0*sqrt(2.0)*c_pv*length(k,iCell))
+              taupt(k,iCell) = KE / (sqrt(2.0)*c_pt*length(k,iCell))
+              taups(k,iCell) = KE / (sqrt(2.0)*c_ps*length(k,iCell))
+              taupv(k,iCell) = KE / (sqrt(2.0)*c_pv*length(k,iCell))
 
               wttend1(k,iCell) = -(Entrainment(k,iCell) + Detrainment(k,iCell)) * &
                 wumd(k,iCell)*tumd(k,iCell)
@@ -439,7 +441,7 @@ module ocn_adc_mixing_fused
 
               vwtend(k,iCell) = (-(vw2(k-1,iCell) - vw2(k,iCell)) / dzmid +   &
                 0.5_RKIND*((0.8_RKIND - 4.0*alpha1/3.0)*0.5_RKIND*KE**2.0_RKIND +  &
-                (alpha1 - alpha2)*v2(i1,k,iCell) + (alpha1 -   &
+                (alpha1 - alpha2)*v2(i1,k,iCell) + (alpha1 +   &
                 alpha2 - 2.0_RKIND)*w2(i1,k,iCell))*Vz + 0.5_RKIND*(alpha1 &
                 - alpha2)*uv(i1,k,iCell)*Uz + beta5*grav*       &
                 (alphaT(k,iCell)*vt(i1,k,iCell) - betaS(k,iCell)*vs(i1,k,iCell))) -            &
@@ -453,7 +455,7 @@ module ocn_adc_mixing_fused
                 (ze(k-1,iCell) - ze(k+1,iCell))**2.0_RKIND
 
               u2tend1(k,iCell) = -(u2w(k-1,iCell) - u2w(k,iCell)) / dzmid
-              u2tend2(k,iCell) = (1.0_RKIND/3.0_RKIND*alpha1 - alpha2 - &
+              u2tend2(k,iCell) = (1.0_RKIND/3.0_RKIND*alpha1 + alpha2 - &
                 2.0_RKIND)*uw(i1,k,iCell)*Uz
               u2tend3(k,iCell) = - 2.0_RKIND/3.0_RKIND*alpha1*vw(i1,k,iCell)*Vz
               u2tend4(k,iCell) = 2.0_RKIND/3.0_RKIND*(1.0_RKIND-beta5)*B
@@ -466,7 +468,7 @@ module ocn_adc_mixing_fused
                 u2tend3(k,iCell) + u2tend4(k,iCell) + u2tend5(k,iCell)
 
               v2tend1(k,iCell) = -(v2w(k-1,iCell) - v2w(k,iCell)) / dzmid
-              v2tend2(k,iCell) = (1.0_RKIND/3.0_RKIND*alpha1 - alpha2 - &
+              v2tend2(k,iCell) = (1.0_RKIND/3.0_RKIND*alpha1 + alpha2 - &
                 2.0_RKIND)*vw(i1,k,iCell)*Vz
               v2tend3(k,iCell) = - 2.0_RKIND/3.0_RKIND*alpha1*uw(i1,k,iCell)*Uz
               v2tend4(k,iCell) = 2.0_RKIND/3.0_RKIND*(1-beta5)*B
