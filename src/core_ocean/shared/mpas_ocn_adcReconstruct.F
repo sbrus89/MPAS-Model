@@ -193,8 +193,8 @@ module ocn_adc_mixing_fused
           do k=2,nVertLevels
             w3av = 0.5_RKIND*(w3(i1,k-1,iCell) + w3(i1,k,iCell))
 
-            Sw = w3av / (max(w2(i1,k,iCell)**1.5_RKIND,epsilon))
-            lareaFraction = 0.5_RKIND - 0.5_RKIND*Sw / sqrt(4.0_RKIND + Sw**2)
+            Sw = w3av / (w2(i1,k,iCell)**1.5_RKIND + 1.0E-15_RKIND)
+            lareaFraction = 0.5_RKIND + 0.5_RKIND*Sw / sqrt(4.0_RKIND + Sw**2)
 
             if(lareaFraction < 0.01_RKIND) lareaFraction = 0.01_RKIND
             if(lareaFraction > 0.99_RKIND) lareaFraction = 0.99_RKIND
@@ -278,7 +278,7 @@ module ocn_adc_mixing_fused
             !  w2kp1 = areaFraction(k+1,iCell)*(1.0_RKIND - areaFraction(k+1,iCell))* &
             !    wumd(k+1,iCell)**2.0
             !  w3tend3(k,iCell) = 1.5_RKIND*(w2k**2.0 - w2kp1**2.0) / dz
-              w3tend2(k,iCell) =  -wumdav**3.0*(6.0*sigav**2.0 - 6.0*sigav + 1)*             &
+              w3tend2(k,iCell) =  wumdav**3.0*(6.0*sigav**2.0 - 6.0*sigav + 1)*             &
                     (areaFraction(k,iCell)*(1.0_RKIND - areaFraction(k,iCell))*  &
                     wumd(k,iCell) - areaFraction(k+1,iCell)*(1.0_RKIND - &
                     areaFraction(k+1,iCell))*wumd(k+1,iCell))/dz
@@ -356,7 +356,7 @@ module ocn_adc_mixing_fused
 
               w2tend1(k,iCell) = -wumd(k,iCell)**2.0_RKIND*(         &
                 Entrainment(k,iCell) + Detrainment(k,iCell))
-              w2tend2(k,iCell) = -(Mc(k-1,iCell)*(1.0_RKIND - 2.0_RKIND*    &
+              w2tend2(k,iCell) = (Mc(k-1,iCell)*(1.0_RKIND - 2.0_RKIND*    &
                 areaFraction(k-1,iCell))*wumd(k-1,iCell)**2.0 - Mc(k+1,iCell)* &
                 (1.0_RKIND - 2.0_RKIND*areaFraction(k+1,iCell))*wumd(k+1,iCell)**2.0) &
                 / (ze(k-1,iCell) - ze(k+1,iCell))
