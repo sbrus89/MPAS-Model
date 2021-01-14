@@ -49,10 +49,10 @@ module ocn_adc_mixing_fused
           tudav = 0.5_RKIND*(tumd(k,iCell) + tumd(k+1,iCell))
           sudav = 0.5*(sumd(k,iCell) + sumd(k+1,iCell))
 
-          Tup = activeTracers(1,k,iCell) + (1.0_RKIND - sav)*tudav
-          Tdo = activeTracers(1,k,iCell) - sav*tudav
-          Sup = activeTracers(2,k,iCell) + (1.0_RKIND - sav)*sudav
-          Sdo = activeTracers(2,k,iCell) - sav*sudav
+          Tup = activeTracers(1,k,iCell) - (1.0_RKIND - sav)*tudav
+          Tdo = activeTracers(1,k,iCell) + sav*tudav
+          Sup = activeTracers(2,k,iCell) - (1.0_RKIND - sav)*sudav
+          Sdo = activeTracers(2,k,iCell) + sav*sudav
 
           Bup(k) = -9.806*(-alphaT(k,iCell)*(Tup - 15.0) + betaS(k,iCell)*(Sup - 35.0))
           Bdo(k) = -9.806*(-alphaT(k,iCell)*(Tdo - 15.0) + betaS(k,iCell)*(Sdo - 35.0))
@@ -185,7 +185,7 @@ module ocn_adc_mixing_fused
           sigav = 0.5_RKIND*(areaFraction(1,iCell) + areaFraction(2,iCell))
           wtav = 0.5_RKIND*(wt(i1,1,iCell) + wt(i1,2,iCell))
           McAv = 0.5_RKIND*(w2(i1,1,iCell) + w2(i1,2,iCell))
-          w2t(1,iCell) = (1.0_RKIND - 2.0_RKIND*sigav)*wtav*sqrt(McAv / (sigav*(1.0_RKIND-sigav)))
+          w2t(1,iCell) = -(1.0_RKIND - 2.0_RKIND*sigav)*wtav*sqrt(McAv / (sigav*(1.0_RKIND-sigav)))
         enddo
 
         !Kernel 1 inlined versions of the base arrays, needed for later to make them collapsible
@@ -216,8 +216,8 @@ module ocn_adc_mixing_fused
             tumdav = 0.5_RKIND*(tumd(k,iCell) + tumd(k+1,iCell))
             sumdav = 0.5_RKIND*(sumd(k,iCell) + sumd(k+1,iCell))
             wumdav = 0.5_RKIND*(wumd(k,iCell) + wumd(k+1,iCell))
-            w2t(k,iCell) = sigav*(1.0_RKIND - sigav)*(1.0_RKIND - 2.0_RKIND*sigav)*wumdav**2.0_RKIND*tumdav
-            w2s(k,iCell) = sigav*(1.0_RKIND - sigav)*(1.0_RKIND - 2.0_RKIND*sigav)*wumdav**2.0_RKIND*sumdav
+            w2t(k,iCell) = -sigav*(1.0_RKIND - sigav)*(1.0_RKIND - 2.0_RKIND*sigav)*wumdav**2.0_RKIND*tumdav
+            w2s(k,iCell) = -sigav*(1.0_RKIND - sigav)*(1.0_RKIND - 2.0_RKIND*sigav)*wumdav**2.0_RKIND*sumdav
             !also use this loop to reset the cliptends for the step
             u2cliptend(k,iCell) = 0.0_RKIND
             v2cliptend(k,iCell) = 0.0_RKIND
@@ -278,7 +278,7 @@ module ocn_adc_mixing_fused
             !  w2kp1 = areaFraction(k+1,iCell)*(1.0_RKIND - areaFraction(k+1,iCell))* &
             !    wumd(k+1,iCell)**2.0
             !  w3tend3(k,iCell) = 1.5_RKIND*(w2k**2.0 - w2kp1**2.0) / dz
-              w3tend2(k,iCell) =  wumdav**3.0*(6.0*sigav**2.0 - 6.0*sigav + 1)*             &
+              w3tend2(k,iCell) =  -wumdav**3.0*(6.0*sigav**2.0 - 6.0*sigav + 1)*             &
                     (areaFraction(k,iCell)*(1.0_RKIND - areaFraction(k,iCell))*  &
                     wumd(k,iCell) - areaFraction(k+1,iCell)*(1.0_RKIND - &
                     areaFraction(k+1,iCell))*wumd(k+1,iCell))/dz
@@ -356,7 +356,7 @@ module ocn_adc_mixing_fused
 
               w2tend1(k,iCell) = -wumd(k,iCell)**2.0_RKIND*(         &
                 Entrainment(k,iCell) + Detrainment(k,iCell))
-              w2tend2(k,iCell) = (Mc(k-1,iCell)*(1.0_RKIND - 2.0_RKIND*    &
+              w2tend2(k,iCell) = -(Mc(k-1,iCell)*(1.0_RKIND - 2.0_RKIND*    &
                 areaFraction(k-1,iCell))*wumd(k-1,iCell)**2.0 - Mc(k+1,iCell)* &
                 (1.0_RKIND - 2.0_RKIND*areaFraction(k+1,iCell))*wumd(k+1,iCell)**2.0) &
                 / (ze(k-1,iCell) - ze(k+1,iCell))
